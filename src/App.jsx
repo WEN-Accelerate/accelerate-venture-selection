@@ -475,7 +475,7 @@ export default function App() {
 
     // Check if we are running with the dummy local key
     // If so, bypass Firebase Auth because it will fail (Error: auth/api-key-not-valid)
-    const isLocalDemo = !firebaseConfig.apiKey || firebaseConfig.apiKey === 'AIzaSyDummyKeyForLocalDev';
+    const isLocalDemo = !firebaseConfig.apiKey || firebaseConfig.apiKey === 'DummyKeyForLocalDev';
 
     if (isLocalDemo) {
       console.warn("Using Dummy/Demo Login (No valid Firebase API Key found)");
