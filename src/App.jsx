@@ -182,7 +182,7 @@ const STREAMS = [
 // --- GEMINI API HELPER ---
 
 const callGemini = async (prompt) => {
-  const apiKey = ""; // Set by runtime environment
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || ""; // Read from environment variables
   const model = "gemini-2.5-flash-preview-09-2025";
 
   if (!apiKey) {
