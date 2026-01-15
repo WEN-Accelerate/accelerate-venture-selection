@@ -261,9 +261,11 @@ const LoginScreen = ({ onLogin, loading }) => (
 
     <div className="max-w-md w-full bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 p-8 relative z-10">
       <div className="flex justify-center mb-6">
-        <div className={`h-16 w-16 ${BRAND_COLORS.red} flex items-center justify-center rounded-xl text-white font-bold text-3xl shadow-lg`}>
-          W
-        </div>
+        <img
+          src="https://wadhwanifoundation.org/wp-content/uploads/2023/10/Wadhwani-Foundation-Logo.png"
+          alt="Wadhwani Foundation"
+          className="h-16 w-auto object-contain"
+        />
       </div>
 
       <div className="text-center mb-8">
@@ -319,13 +321,11 @@ const Header = ({ step, progress, user, onLogout }) => (
   <header className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-100">
     <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <div className={`h-8 w-8 ${BRAND_COLORS.red} flex items-center justify-center rounded-sm text-white font-bold text-lg`}>
-          W
-        </div>
-        <div className="flex flex-col">
-          <span className={`text-sm font-bold ${BRAND_COLORS.textDark} leading-tight`}>WADHWANI</span>
-          <span className="text-[10px] text-gray-500 uppercase tracking-widest leading-tight">Foundation</span>
-        </div>
+        <img
+          src="https://wadhwanifoundation.org/wp-content/uploads/2023/10/Wadhwani-Foundation-Logo.png"
+          alt="Wadhwani Foundation"
+          className="h-10 w-auto object-contain"
+        />
       </div>
       <div className="flex items-center gap-4">
         <div className="flex flex-col items-end">
