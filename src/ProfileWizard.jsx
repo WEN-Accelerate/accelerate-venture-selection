@@ -54,6 +54,42 @@ const callGemini = async (prompt) => {
     }
 };
 
+// --- RENDER HELPERS ---
+// Moved outside to prevent re-render focus loss
+const StepContainer = ({ title, children, showBack = true, onBack, aiContext }) => (
+    <div className="max-w-2xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="mb-8">
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-2">{title}</h1>
+            <div className="h-1 w-20 bg-gradient-to-r from-red-600 to-orange-500 rounded-full"></div>
+        </div>
+
+        <div className="bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl rounded-2xl p-8 relative overflow-hidden">
+            {/* Glassmorphism decorations */}
+            <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+            <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-red-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+
+            <div className="relative z-10 space-y-6">
+                {children}
+            </div>
+        </div>
+
+        <div className="flex justify-between mt-8 items-center">
+            {showBack && (
+                <button onClick={onBack} className="text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors">
+                    Back
+                </button>
+            )}
+            <div className="flex-1"></div>
+            {/* Context Bubble */}
+            {aiContext && (
+                <div className="mr-4 text-xs font-mono text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 max-w-xs truncate">
+                    AI Context: {aiContext}
+                </div>
+            )}
+        </div>
+    </div>
+);
+
 export default function ProfileWizard() {
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -71,7 +107,8 @@ export default function ProfileWizard() {
         ventureType: "Domestic",
         supportNeeded: [],
         commitmentHours: "",
-        growthLead: ""
+        growthLead: "",
+        keyPersonnel: ""
     });
 
     // Auth State
@@ -110,13 +147,15 @@ export default function ProfileWizard() {
       2. Key Products/Services
       3. Target Customers
       4. Estimated Number of Employees
+      5. Key Personnel / Directors / Founders (Names)
       
       Return strictly JSON:
       {
         "industry": "string",
         "products": "string",
         "customers": "string",
-        "employees": "string"
+        "employees": "string",
+        "keyPersonnel": "string"
       }
     `;
 
@@ -124,8 +163,13 @@ export default function ProfileWizard() {
         try {
             const cleaned = result.replace(/```json/g, '').replace(/```/g, '').trim();
             const data = JSON.parse(cleaned);
-            setProfile(prev => ({ ...prev, ...data }));
-            setAiContext(`Analyzed ${profile.companyName}: Found ${data.industry} company with focus on ${data.products}.`);
+            setProfile(prev => ({
+                ...prev,
+                ...data,
+                // Pre-fill growth lead if we found a person, just as a suggestion
+                growthLead: data.keyPersonnel ? data.keyPersonnel.split(',')[0] : prev.growthLead
+            }));
+            setAiContext(`Analyzed ${profile.companyName}: Found ${data.industry} company. Key people: ${data.keyPersonnel || 'N/A'}.`);
             setStep(2);
         } catch (e) {
             console.error("Parse error", e);
@@ -202,41 +246,6 @@ export default function ProfileWizard() {
         setLoading(false);
     };
 
-    // --- RENDER HELPERS ---
-    const StepContainer = ({ title, children, showBack = true }) => (
-        <div className="max-w-2xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-2">{title}</h1>
-                <div className="h-1 w-20 bg-gradient-to-r from-red-600 to-orange-500 rounded-full"></div>
-            </div>
-
-            <div className="bg-white/80 backdrop-blur-xl border border-white/20 shadow-xl rounded-2xl p-8 relative overflow-hidden">
-                {/* Glassmorphism decorations */}
-                <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-indigo-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
-                <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-red-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
-
-                <div className="relative z-10 space-y-6">
-                    {children}
-                </div>
-            </div>
-
-            <div className="flex justify-between mt-8 items-center">
-                {showBack && (
-                    <button onClick={handleBack} className="text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors">
-                        Back
-                    </button>
-                )}
-                <div className="flex-1"></div>
-                {/* Context Bubble */}
-                {aiContext && (
-                    <div className="mr-4 text-xs font-mono text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 max-w-xs truncate">
-                        AI Context: {aiContext}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
     if (loading) return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
             <Loader2 className="w-12 h-12 text-red-600 animate-spin mb-4" />
@@ -264,7 +273,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 1: COMPANY NAME */}
                 {step === 1 && (
-                    <StepContainer title="Let's start with your company" showBack={false}>
+                    <StepContainer title="Let's start with your company" showBack={false} aiContext={aiContext}>
                         <div className="space-y-4">
                             <label className="block text-sm font-semibold text-gray-700">Company Name</label>
                             <input
@@ -292,7 +301,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 2: AUTO-POPULATED INFO */}
                 {step === 2 && (
-                    <StepContainer title="Confirm Business Profile">
+                    <StepContainer title="Confirm Business Profile" onBack={handleBack} aiContext={aiContext}>
                         <div className="grid gap-6">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Industry</label>
@@ -329,6 +338,15 @@ export default function ProfileWizard() {
                                     />
                                 </div>
                             </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Personnel / Directors</label>
+                                <input
+                                    value={profile.keyPersonnel}
+                                    onChange={e => setProfile({ ...profile, keyPersonnel: e.target.value })}
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    placeholder="e.g. John Doe (CEO), Jane Smith (CTO)"
+                                />
+                            </div>
                             <button key="next2" onClick={handleNext} className="btn-primary mt-4 py-3 px-6 bg-gray-900 text-white rounded-lg font-bold hover:bg-black transition-colors">
                                 Confirm & Continue
                             </button>
@@ -338,7 +356,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 3: FINANCIALS */}
                 {step === 3 && (
-                    <StepContainer title="Financial Health">
+                    <StepContainer title="Financial Health" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">Annual Revenue (Last FY)</label>
@@ -379,7 +397,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 4: GROWTH ASPIRATION */}
                 {step === 4 && (
-                    <StepContainer title="Growth Ambition">
+                    <StepContainer title="Growth Ambition" onBack={handleBack} aiContext={aiContext}>
                         <div className="text-center mb-8">
                             <div className="inline-block p-4 bg-green-100 text-green-700 rounded-full mb-4">
                                 <Target size={32} />
@@ -409,7 +427,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 5: VENTURE TYPE */}
                 {step === 5 && (
-                    <StepContainer title="Expansion Strategy">
+                    <StepContainer title="Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div
                                 onClick={() => setProfile({ ...profile, ventureType: 'Domestic' })}
@@ -437,7 +455,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 6: SUPPORT NEEDED */}
                 {step === 6 && (
-                    <StepContainer title="How can Wadhwani help?">
+                    <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
                         <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
                         <div className="grid grid-cols-2 gap-3">
                             {supportOptions.map(opt => (
@@ -459,7 +477,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 7: COMMITMENT */}
                 {step === 7 && (
-                    <StepContainer title="Commitment Check">
+                    <StepContainer title="Commitment Check" onBack={handleBack} aiContext={aiContext}>
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-4">Are you willing to dedicate 4-6 hours per week specifically to drive this initiative?</h3>
                             <div className="space-y-3">
@@ -499,7 +517,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 8: TEAM */}
                 {step === 8 && (
-                    <StepContainer title="Assign a Growth Lead">
+                    <StepContainer title="Assign a Growth Lead" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
                             <p className="text-gray-600 text-sm">Success requires ownership. Who will be the dedicated 'Growth Lead' from your team to own the sprint deliverables?</p>
 
