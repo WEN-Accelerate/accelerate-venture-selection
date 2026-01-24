@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
     ArrowRight, Sparkles, Building2, Users, DollarSign,
-    Target, Globe, CheckCircle, ChevronRight, Loader2, Save
+    Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
+    Mic, MessageSquare, Send, Info, X
 } from 'lucide-react';
 
 import { initializeApp } from 'firebase/app';
@@ -108,8 +109,17 @@ export default function ProfileWizard() {
         supportNeeded: [],
         commitmentHours: "",
         growthLead: "",
-        keyPersonnel: ""
+        keyPersonnel: "",
+        strategyDescription: ""
     });
+
+    // Chat State
+    const [chatMessages, setChatMessages] = useState([
+        { role: 'assistant', text: 'I can help refine your strategy. What are your main concerns about expansion?' }
+    ]);
+    const [chatInput, setChatInput] = useState("");
+    const [showLearnMore, setShowLearnMore] = useState(false);
+    const [learnMoreContent, setLearnMoreContent] = useState("");
 
     // Auth State
     const [user, setUser] = useState(null);
@@ -201,6 +211,26 @@ export default function ProfileWizard() {
         });
     };
 
+    const handleChatSubmit = async () => {
+        if (!chatInput.trim()) return;
+        const userMsg = chatInput;
+        setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        setChatInput("");
+
+        // Simulating AI response
+        const prompt = `User asked: "${userMsg}" in context of ${profile.ventureType} expansion for ${profile.companyName}. Give a helpful 1-sentence tip.`;
+        const reply = await callGemini(prompt);
+        setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
+    };
+
+    const handleLearnMore = async () => {
+        setShowLearnMore(true);
+        setLearnMoreContent("Loading insights...");
+        const prompt = `Explain the key differences and pros/cons between Domestic Expansion and International Go-to-Market for a ${profile.industry} company. Keep it brief.`;
+        const content = await callGemini(prompt);
+        setLearnMoreContent(content);
+    };
+
     // --- FINAL SAVE ---
     const handleSave = async () => {
         if (!user || !user.uid) {
@@ -265,7 +295,7 @@ export default function ProfileWizard() {
                     Wadhwani <span className="text-gray-400 font-normal">Accelerate Profile</span>
                 </div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-widest">
-                    Step {step} of 8
+                    Step {step} of 9
                 </div>
             </header>
 
@@ -447,14 +477,91 @@ export default function ProfileWizard() {
                                 <p className="text-sm text-gray-500">Enter new global markets using exports or direct entry.</p>
                             </div>
                         </div>
-                        <button onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                        <button key="next5" onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
                             Confirm Strategy
                         </button>
+
+                        <div className="mt-4 flex justify-center">
+                            <button
+                                onClick={handleLearnMore}
+                                className="text-sm font-semibold text-indigo-600 flex items-center gap-2 hover:underline"
+                            >
+                                <Info size={16} /> Learn more about these options
+                            </button>
+                        </div>
+
+                        {/* Learn More Modal */}
+                        {showLearnMore && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                                <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative">
+                                    <button onClick={() => setShowLearnMore(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                                        <X size={20} />
+                                    </button>
+                                    <h3 className="text-lg font-bold mb-4">Expansion Strategies Explained</h3>
+                                    <div className="prose prose-sm max-h-[60vh] overflow-y-auto">
+                                        {learnMoreContent}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </StepContainer>
                 )}
 
-                {/* STEP 6: SUPPORT NEEDED */}
+                {/* STEP 6: STRATEGY DESCRIPTION (NEW) */}
                 {step === 6 && (
+                    <StepContainer title="Describe your Strategy" onBack={handleBack} aiContext={aiContext}>
+                        <div className="space-y-6">
+                            <p className="text-gray-600 text-sm">Tell us more about how you plan to execute this. Use the AI chat for help.</p>
+
+                            <div className="relative">
+                                <textarea
+                                    rows={4}
+                                    value={profile.strategyDescription}
+                                    onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
+                                    className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none pr-12"
+                                    placeholder="e.g. We plan to partner with local distributors..."
+                                />
+                                <button className="absolute right-4 bottom-4 p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors" title="Record Voice">
+                                    <Mic size={20} />
+                                </button>
+                            </div>
+
+                            {/* AI Chat Interface */}
+                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                                <div className="flex items-center gap-2 mb-3 text-indigo-800 font-bold text-xs uppercase tracking-wide">
+                                    <Sparkles size={14} /> AI Strategy Assistant
+                                </div>
+                                <div className="h-32 overflow-y-auto mb-3 space-y-2 pr-2">
+                                    {chatMessages.map((msg, i) => (
+                                        <div key={i} className={`text-sm p-2 rounded-lg ${msg.role === 'user' ? 'bg-white ml-auto max-w-[80%]' : 'bg-indigo-100 mr-auto max-w-[90%]'}`}>
+                                            {msg.text}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={chatInput}
+                                        onChange={e => setChatInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleChatSubmit()}
+                                        className="flex-1 p-2 text-sm border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-400"
+                                        placeholder="Ask for suggestions..."
+                                    />
+                                    <button onClick={handleChatSubmit} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                                        <Send size={16} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button onClick={handleNext} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                                Next
+                            </button>
+                        </div>
+                    </StepContainer>
+                )}
+
+                {/* STEP 7: SUPPORT NEEDED */}
+                {step === 7 && (
                     <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
                         <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
                         <div className="grid grid-cols-2 gap-3">
@@ -475,8 +582,8 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 7: COMMITMENT */}
-                {step === 7 && (
+                {/* STEP 8: COMMITMENT */}
+                {step === 8 && (
                     <StepContainer title="Commitment Check" onBack={handleBack} aiContext={aiContext}>
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                             <h3 className="font-bold text-gray-900 mb-4">Are you willing to dedicate 4-6 hours per week specifically to drive this initiative?</h3>
@@ -515,8 +622,8 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 8: TEAM */}
-                {step === 8 && (
+                {/* STEP 9: TEAM */}
+                {step === 9 && (
                     <StepContainer title="Assign a Growth Lead" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
                             <p className="text-gray-600 text-sm">Success requires ownership. Who will be the dedicated 'Growth Lead' from your team to own the sprint deliverables?</p>
