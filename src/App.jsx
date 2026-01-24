@@ -41,11 +41,19 @@ import {
   Download
 } from 'lucide-react';
 
+import { createClient } from '@supabase/supabase-js';
+
 // --- FIREBASE SETUP ---
 // Initialize Firebase using the global config injected by the environment
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// --- SUPABASE SETUP ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 
 // --- DATA MODELS & CONSTANTS ---
 
@@ -443,6 +451,46 @@ export default function App() {
   // State: Readiness
   const [readinessAnswers, setReadinessAnswers] = useState({});
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
+  // --- PROFILE SYNC ---
+  useEffect(() => {
+    if (user && !authLoading) {
+      const checkProfile = async () => {
+        try {
+          // Fetch latest profile for demo purposes
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('details')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (data && data.details) {
+            // Profile found, pre-fill App state
+            setBusinessData(prev => ({
+              ...prev,
+              name: data.details.companyName || prev.name,
+              industry: data.details.industry || prev.industry,
+              revenue: data.details.revenue || prev.revenue,
+              employees: data.details.employees || prev.employees,
+              description: data.details.products ? `${data.details.products}. Target: ${data.details.customers}` : prev.description,
+              expansionIdeas: data.details.ventureType ? `Expand to ${data.details.ventureType} markets` : prev.expansionIdeas
+            }));
+          } else {
+            // No profile found, redirect to wizard
+            // Check if we are just starting (step 1)
+            if (step === 1 && !window.location.search.includes('skip')) {
+              window.location.href = '/profile.html';
+            }
+          }
+        } catch (err) {
+          console.warn("Profile sync error:", err);
+        }
+      };
+
+      checkProfile();
+    }
+  }, [user, authLoading, step]);
 
   // --- AUTH HANDLERS ---
 
