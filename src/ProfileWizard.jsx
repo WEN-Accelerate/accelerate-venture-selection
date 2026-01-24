@@ -159,28 +159,31 @@ export default function ProfileWizard() {
 
     // --- FINAL SAVE ---
     const handleSave = async () => {
+        if (!user || !user.uid) {
+            alert("Authentication missing. Please reload or sign in.");
+            return;
+        }
+
         setLoading(true);
-        // User ID should be retrieved from auth context or local storage. 
-        // For now assuming anonymous or handling it loosely.
-        // In a real app we'd get the session.
-
-        console.log("Saving to Supabase:", profile);
-
-        // Using upsert or similar. Since we don't have the table perfectly defined in my context 
-        // I will try to insert into a 'profiles' table which is standard best practice.
+        console.log("Saving to Supabase for User:", user.uid);
 
         const { error } = await supabase
             .from('profiles')
             .upsert([
                 {
-                    user_id: user?.uid, // Link to the authenticated user
+                    user_id: user.uid,
                     company_name: profile.companyName,
                     details: profile,
                     updated_at: new Date()
                 }
-            ], { onConflict: 'user_id' }); // Ensure we update the existing row for this user
+            ], { onConflict: 'user_id' });
 
-        if (error) console.error("Supabase Error:", error);
+        if (error) {
+            console.error("Supabase Error:", error);
+            alert(`Failed to save profile: ${error.message}. ensure the 'profiles' table exists in Supabase.`);
+            setLoading(false);
+            return;
+        }
 
         // Redirect to Dashboard
         window.location.href = '/';

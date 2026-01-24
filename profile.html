@@ -2,15 +2,26 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create Profile - Wadhwani Accelerate</title>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Profile - Wadhwani Accelerate</title>
+    <script>
+        // Mock global config if missing (for local dev)
+        if (typeof __firebase_config === 'undefined') {
+            window.__firebase_config = JSON.stringify({
+                apiKey: "DummyKeyForLocalDev",
+                authDomain: "dummy.firebaseapp.com",
+                projectId: "dummy-project"
+            });
+            console.log("Using localized mock firebase config");
+        }
+    </script>
 </head>
 
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/profile.jsx"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/profile.jsx"></script>
 </body>
 
 </html>
