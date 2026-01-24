@@ -119,7 +119,8 @@ export default function ProfileWizard() {
     ]);
     const [chatInput, setChatInput] = useState("");
     const [showLearnMore, setShowLearnMore] = useState(false);
-    const [learnMoreContent, setLearnMoreContent] = useState("");
+    const [learnMoreData, setLearnMoreData] = useState(null); // Changed to object for structured UI
+    const [learnMoreLoading, setLearnMoreLoading] = useState(false);
 
     // Auth State
     const [user, setUser] = useState(null);
@@ -217,18 +218,64 @@ export default function ProfileWizard() {
         setChatMessages(prev => [...prev, { role: 'user', text: userMsg }]);
         setChatInput("");
 
-        // Simulating AI response
-        const prompt = `User asked: "${userMsg}" in context of ${profile.ventureType} expansion for ${profile.companyName}. Give a helpful 1-sentence tip.`;
+        // Context-aware AI response
+        const prompt = `
+            Act as a Senior Growth Consultant for:
+            Company: ${profile.companyName}
+            Industry: ${profile.industry}
+            Product: ${profile.products}
+            Employees: ${profile.employees}
+            Current Revenue: ${profile.revenue}
+            
+            Context: The user is defining their "${profile.ventureType}" expansion strategy.
+            User Question: "${userMsg}"
+            
+            Provide a short, specific, and high-impact piece of advice (max 2 sentences).
+        `;
         const reply = await callGemini(prompt);
         setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
     };
 
     const handleLearnMore = async () => {
         setShowLearnMore(true);
-        setLearnMoreContent("Loading insights...");
-        const prompt = `Explain the key differences and pros/cons between Domestic Expansion and International Go-to-Market for a ${profile.industry} company. Keep it brief.`;
-        const content = await callGemini(prompt);
-        setLearnMoreContent(content);
+        setLearnMoreLoading(true);
+        setLearnMoreData(null); // Clear previous data
+
+        const prompt = `
+            Analyze specific expansion options for:
+            Company: ${profile.companyName}
+            Industry: ${profile.industry}
+            Products: ${profile.products}
+            Target Customers: ${profile.customers}
+
+            Task: Compare "Domestic Expansion" vs "International Expansion" for THIS specific business.
+            Return a JSON array with exactly 2 objects (one for each option).
+            
+            Structure:
+            [
+              {
+                "type": "QUICK WIN" or "STRATEGIC MOVE",
+                "title": "EXPAND DOMESTICALLY" or "GO INTERNATIONAL",
+                "recommendation": "Specific advice...",
+                "impact": "Expected outcome..."
+              },
+               ...
+            ]
+            Return strictly JSON.
+        `;
+
+        try {
+            const raw = await callGemini(prompt);
+            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+            setLearnMoreData(JSON.parse(clean));
+        } catch (e) {
+            console.error("AI Error", e);
+            setLearnMoreData([
+                { title: "DOMESTIC EXPANSION", type: "LOWER RISK", recommendation: "Focus on capturing more market share in your home region.", impact: "Steady growth with lower capital risk." },
+                { title: "INTERNATIONAL EXPANSION", type: "HIGH REWARD", recommendation: "Export to markets with similar regulatory frameworks.", impact: "Potential for exponential revenue scaling." }
+            ]);
+        }
+        setLearnMoreLoading(false);
     };
 
     // --- FINAL SAVE ---
@@ -490,16 +537,49 @@ export default function ProfileWizard() {
                             </button>
                         </div>
 
-                        {/* Learn More Modal */}
+                        {/* Learn More Modal (Premium Dark UI) */}
                         {showLearnMore && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-                                <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative">
-                                    <button onClick={() => setShowLearnMore(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                                        <X size={20} />
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+                                <div className="bg-[#1a202c] rounded-xl max-w-2xl w-full p-8 relative shadow-2xl border border-gray-700">
+                                    <button onClick={() => setShowLearnMore(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
+                                        <X size={24} />
                                     </button>
-                                    <h3 className="text-lg font-bold mb-4">Expansion Strategies Explained</h3>
-                                    <div className="prose prose-sm max-h-[60vh] overflow-y-auto">
-                                        {learnMoreContent}
+
+                                    <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                                        <Sparkles className="text-yellow-400" />
+                                        Strategic Intelligence for {profile.companyName}
+                                    </h3>
+
+                                    <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                                        {learnMoreLoading ? (
+                                            <div className="flex flex-col items-center justify-center py-12">
+                                                <Loader2 className="w-10 h-10 text-yellow-400 animate-spin mb-4" />
+                                                <p className="text-gray-400">Analyzing market context...</p>
+                                            </div>
+                                        ) : (
+                                            learnMoreData?.map((item, idx) => (
+                                                <div key={idx} className="bg-[#2d3748] rounded-lg p-6 border-l-4 border-yellow-500 shadow-lg">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-xs font-bold text-yellow-500 tracking-wider uppercase">
+                                                            RECOMMENDATION {idx + 1}: {item.type}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className="text-xl font-bold text-white mb-2">{item.title}</h4>
+                                                    <p className="text-gray-300 text-sm leading-relaxed mb-4">
+                                                        {item.recommendation}
+                                                    </p>
+                                                    <div className="bg-yellow-500/10 p-3 rounded flex items-start gap-3">
+                                                        <div className="mt-1">
+                                                            <Target size={16} className="text-yellow-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-yellow-600 uppercase mb-0.5">ESTIMATED IMPACT</p>
+                                                            <p className="text-xs text-yellow-100 font-medium">{item.impact}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             </div>
