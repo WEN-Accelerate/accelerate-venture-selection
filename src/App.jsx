@@ -457,13 +457,12 @@ export default function App() {
     if (user && !authLoading) {
       const checkProfile = async () => {
         try {
-          // Fetch latest profile for demo purposes
+          // Fetch profile for the current user
           const { data, error } = await supabase
             .from('profiles')
             .select('details')
-            .order('updated_at', { ascending: false })
-            .limit(1)
-            .single();
+            .eq('user_id', user.uid)
+            .maybeSingle();
 
           if (data && data.details) {
             // Profile found, pre-fill App state
