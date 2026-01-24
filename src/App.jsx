@@ -465,7 +465,7 @@ export default function App() {
             .maybeSingle();
 
           if (data && data.details) {
-            // Profile found, pre-fill App state
+            // Profile found in DB
             setBusinessData(prev => ({
               ...prev,
               name: data.details.companyName || prev.name,
@@ -476,7 +476,25 @@ export default function App() {
               expansionIdeas: data.details.ventureType ? `Expand to ${data.details.ventureType} markets` : prev.expansionIdeas
             }));
           } else {
-            // No profile found, redirect to wizard
+            // CHECK LOCAL STORAGE FALLBACK
+            const localData = localStorage.getItem('user_profile_data');
+            if (localData) {
+              const parsed = JSON.parse(localData);
+              const details = parsed.details;
+              console.log("Using local fallback profile");
+              setBusinessData(prev => ({
+                ...prev,
+                name: details.companyName || prev.name,
+                industry: details.industry || prev.industry,
+                revenue: details.revenue || prev.revenue,
+                employees: details.employees || prev.employees,
+                description: details.products ? `${details.products}. Target: ${details.customers}` : prev.description,
+                expansionIdeas: details.ventureType ? `Expand to ${details.ventureType} markets` : prev.expansionIdeas
+              }));
+              return; // Found local data, stop here
+            }
+
+            // No profile found ANYWHERE, redirect to wizard
             // Check if we are just starting (step 1)
             if (step === 1 && !window.location.search.includes('skip')) {
               window.location.href = '/profile.html';

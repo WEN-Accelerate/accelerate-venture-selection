@@ -180,10 +180,22 @@ export default function ProfileWizard() {
 
         if (error) {
             console.error("Supabase Error:", error);
-            alert(`Failed to save profile: ${error.message}. ensure the 'profiles' table exists in Supabase.`);
+            // FALLBACK: Save to LocalStorage so the user can still proceed!
+            console.log("Falling back to local storage...");
+            localStorage.setItem('user_profile_data', JSON.stringify({
+                companyName: profile.companyName,
+                details: profile,
+                updated_at: new Date()
+            }));
+
+            alert(`Note: Database request failed (${error.message}). \n\nWe saved your profile locally so you can continue to the dashboard.`);
+            window.location.href = '/';
             setLoading(false);
             return;
         }
+
+        // on successful save, clear local fallback to avoid confusion
+        localStorage.removeItem('user_profile_data');
 
         // Redirect to Dashboard
         window.location.href = '/';
