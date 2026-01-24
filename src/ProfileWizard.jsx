@@ -58,7 +58,7 @@ const callGemini = async (prompt) => {
 // --- RENDER HELPERS ---
 // Moved outside to prevent re-render focus loss
 const StepContainer = ({ title, children, showBack = true, onBack, aiContext }) => (
-    <div className="max-w-2xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-6xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="mb-8">
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 mb-2">{title}</h1>
             <div className="h-1 w-20 bg-gradient-to-r from-red-600 to-orange-500 rounded-full"></div>
@@ -379,7 +379,7 @@ export default function ProfileWizard() {
                 {/* STEP 2: AUTO-POPULATED INFO */}
                 {step === 2 && (
                     <StepContainer title="Confirm Business Profile" onBack={handleBack} aiContext={aiContext}>
-                        <div className="grid gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Industry</label>
                                 <input
@@ -397,37 +397,38 @@ export default function ProfileWizard() {
                                     className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Target Customers</label>
-                                    <input
-                                        value={profile.customers}
-                                        onChange={e => setProfile({ ...profile, customers: e.target.value })}
-                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Employees</label>
-                                    <input
-                                        value={profile.employees}
-                                        onChange={e => setProfile({ ...profile, employees: e.target.value })}
-                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                    />
-                                </div>
-                            </div>
+
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Personnel / Directors</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Target Customers</label>
                                 <input
-                                    value={profile.keyPersonnel}
-                                    onChange={e => setProfile({ ...profile, keyPersonnel: e.target.value })}
+                                    value={profile.customers}
+                                    onChange={e => setProfile({ ...profile, customers: e.target.value })}
                                     className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                    placeholder="e.g. John Doe (CEO), Jane Smith (CTO)"
                                 />
                             </div>
-                            <button key="next2" onClick={handleNext} className="btn-primary mt-4 py-3 px-6 bg-gray-900 text-white rounded-lg font-bold hover:bg-black transition-colors">
-                                Confirm & Continue
-                            </button>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Employees</label>
+                                <input
+                                    value={profile.employees}
+                                    onChange={e => setProfile({ ...profile, employees: e.target.value })}
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                />
+                            </div>
                         </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Personnel / Directors</label>
+                            <input
+                                value={profile.keyPersonnel}
+                                onChange={e => setProfile({ ...profile, keyPersonnel: e.target.value })}
+                                className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                placeholder="e.g. John Doe (CEO), Jane Smith (CTO)"
+                            />
+                        </div>
+                        <button key="next2" onClick={handleNext} className="btn-primary mt-4 py-3 px-6 bg-gray-900 text-white rounded-lg font-bold hover:bg-black transition-colors">
+                            Confirm & Continue
+                        </button>
                     </StepContainer>
                 )}
 
@@ -538,9 +539,10 @@ export default function ProfileWizard() {
                         </div>
 
                         {/* Learn More Modal (Premium Dark UI) */}
+                        {/* Learn More Modal (Premium Dark UI) */}
                         {showLearnMore && (
                             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                                <div className="bg-[#1a202c] rounded-xl max-w-2xl w-full p-8 relative shadow-2xl border border-gray-700">
+                                <div className="bg-[#1a202c] rounded-xl max-w-5xl w-full p-8 relative shadow-2xl border border-gray-700">
                                     <button onClick={() => setShowLearnMore(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
                                         <X size={24} />
                                     </button>
@@ -644,7 +646,7 @@ export default function ProfileWizard() {
                 {step === 7 && (
                     <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
                         <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {supportOptions.map(opt => (
                                 <div
                                     key={opt.id}
@@ -731,6 +733,6 @@ export default function ProfileWizard() {
                 )}
 
             </div>
-        </div>
+        </div >
     );
 }
