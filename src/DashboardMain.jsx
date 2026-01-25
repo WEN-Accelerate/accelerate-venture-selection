@@ -196,11 +196,9 @@ export default function DashboardMain() {
         setProfile(newProfile); // Optimistic update
 
         // Save to DB
-        // Save to DB
         if (user && !user.isAnonymous) {
             console.log("Saving profile to Supabase...", user.uid);
 
-            // Ensure we include company_name so it doesn't get wiped or violate constraints
             const payload = {
                 user_id: user.uid,
                 details: newProfile,
@@ -221,380 +219,377 @@ export default function DashboardMain() {
                 console.log("Supabase Save Success.", data);
             }
         } else {
-            console.log("Supabase Save Success.");
+            // Local save
+            console.log("Saving profile to LocalStorage (Guest)...");
+            localStorage.setItem('user_profile_data', JSON.stringify({ details: newProfile }));
         }
-    } else {
-        // Local save
-        console.log("Saving profile to LocalStorage (Guest)...");
-    localStorage.setItem('user_profile_data', JSON.stringify({ details: newProfile }));
-}
     };
 
-// --- RENDER HELPERS ---
+    // --- RENDER HELPERS ---
 
-// Parse supportDetails into usable cards
-const cards = useMemo(() => {
-    if (!profile || !profile.supportDetails) return [];
+    // Parse supportDetails into usable cards
+    const cards = useMemo(() => {
+        if (!profile || !profile.supportDetails) return [];
 
-    return Object.entries(profile.supportDetails).map(([key, type]) => {
-        const [category, item] = key.split('_');
-        const meta = profile.supportMetadata?.[key] || {};
+        return Object.entries(profile.supportDetails).map(([key, type]) => {
+            const [category, item] = key.split('_');
+            const meta = profile.supportMetadata?.[key] || {};
 
-        return {
-            id: key,
-            category,
-            item,
-            type, // WF, Self, NA
-            dueDate: meta.dueDate || '',
-            owner: meta.owner || '',
-            description: meta.description || '',
-            context: meta.context || '',
-            objectives: meta.objectives || '',
-            subActions: meta.subActions || []
-        };
-    }).filter(card => {
-        if (filter === 'ALL') return card.type !== 'NA'; // Usually hide NA in "Everything"
-        if (filter === 'NA') return card.type === 'NA';
-        return card.type === filter; // WF or Self
-    });
-}, [profile, filter]);
+            return {
+                id: key,
+                category,
+                item,
+                type, // WF, Self, NA
+                dueDate: meta.dueDate || '',
+                owner: meta.owner || '',
+                description: meta.description || '',
+                context: meta.context || '',
+                objectives: meta.objectives || '',
+                subActions: meta.subActions || []
+            };
+        }).filter(card => {
+            if (filter === 'ALL') return card.type !== 'NA'; // Usually hide NA in "Everything"
+            if (filter === 'NA') return card.type === 'NA';
+            return card.type === filter; // WF or Self
+        });
+    }, [profile, filter]);
 
-if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="animate-spin text-red-600 w-12 h-12" />
-    </div>
-);
-
-if (!profile) {
     if (loading) return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-            <Loader2 className="w-10 h-10 text-red-600 animate-spin mb-4" />
-            <p className="text-gray-500 font-medium">Loading Dashboard...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <Loader2 className="animate-spin text-red-600 w-12 h-12" />
         </div>
     );
+
+    if (!profile) {
+        if (loading) return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+                <Loader2 className="w-10 h-10 text-red-600 animate-spin mb-4" />
+                <p className="text-gray-500 font-medium">Loading Dashboard...</p>
+            </div>
+        );
+
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F6F8] p-6 text-center">
+                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Users className="text-red-600 w-8 h-8" />
+                    </div>
+
+                    {!user ? (
+                        <>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
+                            <p className="text-gray-500 mb-8">Please log in to access your operations dashboard.</p>
+                            <button
+                                onClick={() => netlifyIdentity.open()}
+                                className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all mb-4"
+                            >
+                                Log In
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Setup Required</h2>
+                            <p className="text-gray-500 mb-8">
+                                We couldn't find a business profile linked to <strong>{user.email || 'this account'}</strong>.
+                            </p>
+                            <a
+                                href="/index.html"
+                                className="block w-full py-3 bg-[#D32F2F] text-white font-bold rounded-xl hover:bg-red-800 transition-all mb-4"
+                            >
+                                Create New Profile
+                            </a>
+                        </>
+                    )}
+
+                    <a href="/index.html" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
+                        Return to Home
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F6F8] p-6 text-center">
-            <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
-                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Users className="text-red-600 w-8 h-8" />
-                </div>
+        <div className="min-h-screen bg-[#F4F6F8] font-sans text-gray-900 selection:bg-red-100 selection:text-red-900">
+            {/* HEADER */}
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src="https://wadhwanifoundation.org/wp-content/uploads/2023/10/Wadhwani-Foundation-Logo.png"
+                            alt="Wadhwani Foundation"
+                            className="h-8 w-auto object-contain"
+                        />
+                        <div className="h-4 w-[1px] bg-gray-300 mx-1"></div>
+                        <h1 className="text-xl font-bold font-barlow tracking-tight text-gray-900">
+                            Accelerate <span className="text-red-600">Dashboard</span>
+                        </h1>
+                    </div>
 
-                {!user ? (
-                    <>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-                        <p className="text-gray-500 mb-8">Please log in to access your operations dashboard.</p>
+                    {/* CENTER: VIEW MODE TOGGLE */}
+                    <div className="bg-white border border-gray-200 p-1 rounded-full flex gap-1 shadow-sm">
                         <button
-                            onClick={() => netlifyIdentity.open()}
-                            className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all mb-4"
+                            onClick={() => setViewMode('context')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
+                                ? 'bg-[#1e293b] text-white shadow-md'
+                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                }`}
                         >
-                            Log In
+                            <Sparkles size={12} className={viewMode === 'context' ? 'text-yellow-400' : ''} />
+                            Blueprint
                         </button>
-                    </>
-                ) : (
-                    <>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Setup Required</h2>
-                        <p className="text-gray-500 mb-8">
-                            We couldn't find a business profile linked to <strong>{user.email || 'this account'}</strong>.
-                        </p>
-                        <a
-                            href="/index.html"
-                            className="block w-full py-3 bg-[#D32F2F] text-white font-bold rounded-xl hover:bg-red-800 transition-all mb-4"
+                        <button
+                            onClick={() => setViewMode('sprint')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
+                                ? 'bg-[#D32F2F] text-white shadow-md'
+                                : 'text-gray-500 hover:text-red-700 hover:bg-red-50'
+                                }`}
                         >
-                            Create New Profile
-                        </a>
-                    </>
+                            <Target size={12} />
+                            Sprint
+                        </button>
+                        <button
+                            onClick={() => setViewMode('actions')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'actions'
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'text-gray-500 hover:text-indigo-700 hover:bg-indigo-50'
+                                }`}
+                        >
+                            <Briefcase size={12} />
+                            Actions
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className="text-right hidden md:block">
+                            <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-all"
+                            title="Log Out"
+                        >
+                            <LogOut size={20} />
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <main className="max-w-7xl mx-auto px-8 pt-8 pb-20">
+
+                {/* VIEW: CONTEXT (STRATEGY BLUEPRINT) */}
+                {viewMode === 'context' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+                        {/* 1. HEADER CARD */}
+                        <div className="bg-gradient-to-r from-[#D32F2F] to-[#b71c1c] text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                            <div className="relative z-10 flex items-start justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Sparkles className="text-yellow-300 w-4 h-4" />
+                                        <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase">Strategic Blueprint</span>
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
+                                    <p className="text-white/80 text-sm">Review your expansion roadmap before proceeding.</p>
+                                </div>
+                                {profile.logoUrl && (
+                                    <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
+                                        <img src={profile.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 2. ORGANIZATION PROFILE */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <Building2 className="text-gray-400" size={20} />
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Organization Profile</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Industry</label>
+                                    <div className="font-semibold text-gray-900">{profile.industry || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Employees</label>
+                                    <div className="font-semibold text-gray-900">{profile.employees || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Personnel</label>
+                                    <div className="font-semibold text-gray-900">{profile.keyPersonnel || '-'}</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Target Customer</label>
+                                    <div className="font-semibold text-gray-900 leading-relaxed text-sm">{profile.customers || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Products</label>
+                                    <div className="font-semibold text-gray-900 leading-relaxed text-sm">{profile.products || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. FINANCIAL BASELINE */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <CreditCard className="text-gray-400" size={20} />
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Financial Baseline</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Current Revenue</label>
+                                    <div className="text-3xl font-black text-gray-900">{profile.revenue || '-'}</div>
+                                </div>
+                                <div className="flex flex-col md:items-end">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Profitability Status</label>
+                                    <span className={`px - 4 py - 1.5 rounded - full text - xs font - bold uppercase tracking - wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
+                                        profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-600'
+                                        } `}>
+                                        {profile.profitability || 'Unknown'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 4. EXPANSION STRATEGY (Restyled) */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <TrendingUp className="text-gray-400" size={20} />
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Expansion Strategy</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Venture Type</label>
+                                    <div className="flex items-center gap-3">
+                                        {profile.ventureType === 'Domestic' ?
+                                            <Building2 size={24} className="text-orange-500" /> :
+                                            <Globe size={24} className="text-indigo-500" />
+                                        }
+                                        <span className="text-xl font-bold text-gray-900">{profile.ventureType} Expansion</span>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">4-Year Revenue Target</label>
+                                    <div className="text-2xl font-black text-emerald-600">
+                                        {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-8">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Core Strategy Statement</label>
+                                <p className="text-sm text-gray-600 leading-relaxed border-l-4 border-red-500 pl-4 italic bg-gray-50 py-3 pr-3 rounded-r-lg">
+                                    "{profile.strategyDescription || 'No summary provided.'}"
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-4">Execution Framework (4Ps)</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Product</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.product || '-'}</div>
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Proposition</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.proposition || '-'}</div>
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Channel (Place)</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.place || '-'}</div>
+                                    </div>
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Promotion</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.promotion || '-'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
-                <a href="/index.html" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
-                    Return to Home
-                </a>
-            </div>
-        </div>
-    );
-}
-
-
-
-return (
-    <div className="min-h-screen bg-[#F4F6F8] font-sans text-gray-900 selection:bg-red-100 selection:text-red-900">
-        {/* HEADER */}
-        <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm">
-            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <img
-                        src="https://wadhwanifoundation.org/wp-content/uploads/2023/10/Wadhwani-Foundation-Logo.png"
-                        alt="Wadhwani Foundation"
-                        className="h-8 w-auto object-contain"
-                    />
-                    <div className="h-4 w-[1px] bg-gray-300 mx-1"></div>
-                    <h1 className="text-xl font-bold font-barlow tracking-tight text-gray-900">
-                        Accelerate <span className="text-red-600">Dashboard</span>
-                    </h1>
-                </div>
-
-                {/* CENTER: VIEW MODE TOGGLE */}
-                <div className="bg-white border border-gray-200 p-1 rounded-full flex gap-1 shadow-sm">
-                    <button
-                        onClick={() => setViewMode('context')}
-                        className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
-                            ? 'bg-[#1e293b] text-white shadow-md'
-                            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-                            }`}
-                    >
-                        <Sparkles size={12} className={viewMode === 'context' ? 'text-yellow-400' : ''} />
-                        Blueprint
-                    </button>
-                    <button
-                        onClick={() => setViewMode('sprint')}
-                        className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
-                            ? 'bg-[#D32F2F] text-white shadow-md'
-                            : 'text-gray-500 hover:text-red-700 hover:bg-red-50'
-                            }`}
-                    >
-                        <Target size={12} />
-                        Sprint
-                    </button>
-                    <button
-                        onClick={() => setViewMode('actions')}
-                        className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'actions'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'text-gray-500 hover:text-indigo-700 hover:bg-indigo-50'
-                            }`}
-                    >
-                        <Briefcase size={12} />
-                        Actions
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <div className="text-right hidden md:block">
-                        <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
-                        <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
-                    </div>
-                    <button
-                        onClick={handleLogout}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-all"
-                        title="Log Out"
-                    >
-                        <LogOut size={20} />
-                    </button>
-                </div>
-            </div>
-        </header>
-        <main className="max-w-7xl mx-auto px-8 pt-8 pb-20">
-
-            {/* VIEW: CONTEXT (STRATEGY BLUEPRINT) */}
-            {viewMode === 'context' && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-                    {/* 1. HEADER CARD */}
-                    <div className="bg-gradient-to-r from-[#D32F2F] to-[#b71c1c] text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                        <div className="relative z-10 flex items-start justify-between">
-                            <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Sparkles className="text-yellow-300 w-4 h-4" />
-                                    <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase">Strategic Blueprint</span>
-                                </div>
-                                <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
-                                <p className="text-white/80 text-sm">Review your expansion roadmap before proceeding.</p>
+                {/* VIEW: SPRINT (CARDS) */}
+                {viewMode === 'sprint' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* SPRINT FILTERS */}
+                        <div className="flex justify-center mb-10">
+                            <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-200">
+                                <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
+                                <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
+                                <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
                             </div>
-                            {profile.logoUrl && (
-                                <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
-                                    <img src={profile.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                        </div>
+
+                        {/* GRID */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {cards.map(card => (
+                                <KaizenCard
+                                    key={card.id}
+                                    card={card}
+                                    onClick={() => setSelectedCard(card)}
+                                />
+                            ))}
+                            {cards.length === 0 && (
+                                <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-3xl">
+                                    <Filter size={48} className="mb-4 opacity-20" />
+                                    <p className="text-sm font-semibold">No items found for this filter.</p>
                                 </div>
                             )}
                         </div>
                     </div>
+                )}
 
-                    {/* 2. ORGANIZATION PROFILE */}
-                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-                            <Building2 className="text-gray-400" size={20} />
-                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Organization Profile</h3>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Industry</label>
-                                <div className="font-semibold text-gray-900">{profile.industry || '-'}</div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Employees</label>
-                                <div className="font-semibold text-gray-900">{profile.employees || '-'}</div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Personnel</label>
-                                <div className="font-semibold text-gray-900">{profile.keyPersonnel || '-'}</div>
+                {/* VIEW: ACTIONS (CONSOLIDATED RESOURCES) */}
+                {viewMode === 'actions' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* ACTIONS FILTERS */}
+                        <div className="flex justify-center mb-10">
+                            <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-200">
+                                <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
+                                <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
+                                <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Target Customer</label>
-                                <div className="font-semibold text-gray-900 leading-relaxed text-sm">{profile.customers || '-'}</div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Products</label>
-                                <div className="font-semibold text-gray-900 leading-relaxed text-sm">{profile.products || '-'}</div>
-                            </div>
-                        </div>
+                        <ActionCenterView cards={cards} />
                     </div>
+                )}
 
-                    {/* 3. FINANCIAL BASELINE */}
-                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-                            <CreditCard className="text-gray-400" size={20} />
-                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Financial Baseline</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Current Revenue</label>
-                                <div className="text-3xl font-black text-gray-900">{profile.revenue || '-'}</div>
-                            </div>
-                            <div className="flex flex-col md:items-end">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Profitability Status</label>
-                                <span className={`px - 4 py - 1.5 rounded - full text - xs font - bold uppercase tracking - wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
-                                    profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
-                                        'bg-gray-100 text-gray-600'
-                                    } `}>
-                                    {profile.profitability || 'Unknown'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+            </main>
 
-                    {/* 4. EXPANSION STRATEGY (Restyled) */}
-                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-                        <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
-                            <TrendingUp className="text-gray-400" size={20} />
-                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Expansion Strategy</h3>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                            <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Venture Type</label>
-                                <div className="flex items-center gap-3">
-                                    {profile.ventureType === 'Domestic' ?
-                                        <Building2 size={24} className="text-orange-500" /> :
-                                        <Globe size={24} className="text-indigo-500" />
-                                    }
-                                    <span className="text-xl font-bold text-gray-900">{profile.ventureType} Expansion</span>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">4-Year Revenue Target</label>
-                                <div className="text-2xl font-black text-emerald-600">
-                                    {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mb-8">
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Core Strategy Statement</label>
-                            <p className="text-sm text-gray-600 leading-relaxed border-l-4 border-red-500 pl-4 italic bg-gray-50 py-3 pr-3 rounded-r-lg">
-                                "{profile.strategyDescription || 'No summary provided.'}"
-                            </p>
-                        </div>
-
-                        <div>
-                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-4">Execution Framework (4Ps)</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
-                                    <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Product</div>
-                                    <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.product || '-'}</div>
-                                </div>
-                                <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
-                                    <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Proposition</div>
-                                    <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.proposition || '-'}</div>
-                                </div>
-                                <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
-                                    <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Channel (Place)</div>
-                                    <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.place || '-'}</div>
-                                </div>
-                                <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
-                                    <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Promotion</div>
-                                    <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.promotion || '-'}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            {/* RIGHT SIDE PANEL (SLIDE OVERS) */}
+            {selectedCard && (
+                <ActionPlanPanel
+                    card={selectedCard}
+                    profile={profile} // Pass full profile for AI context
+                    onClose={() => setSelectedCard(null)}
+                    onSave={(updates) => {
+                        handleUpdateCard(selectedCard.id, updates);
+                        // Don't close immediately on save to allow further editing, or close if preferred.
+                        // For a panel, usually explicit close is better, but let's keep it open to show success?
+                        // Actually, 'Save' usually implies 'Finish' in this context. Let's keep it open if it's "Save", close if "Done".
+                        // Logic ref: we'll just update the card live and maybe show a toast.
+                        // For now, let's keep the parent state updated but not close relevant to typical slide-over behavior.
+                        // However, to refresh the `cards` list, `selectedCard` needs to update? No, handleUpdateCard updates profile.
+                        // To keep UI in sync, we might need to re-fetch or re-calc. `cards` is memoized on profile.
+                        // We will update the `selectedCard` prop by closing/reopening? 
+                        // Better: The panel manages its own local state which initializes from props.
+                        // When we save, we push to DB. Next time it opens, it pulls new data.
+                    }}
+                />
             )}
-
-            {/* VIEW: SPRINT (CARDS) */}
-            {viewMode === 'sprint' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* SPRINT FILTERS */}
-                    <div className="flex justify-center mb-10">
-                        <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-200">
-                            <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
-                            <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
-                            <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
-                        </div>
-                    </div>
-
-                    {/* GRID */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {cards.map(card => (
-                            <KaizenCard
-                                key={card.id}
-                                card={card}
-                                onClick={() => setSelectedCard(card)}
-                            />
-                        ))}
-                        {cards.length === 0 && (
-                            <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-3xl">
-                                <Filter size={48} className="mb-4 opacity-20" />
-                                <p className="text-sm font-semibold">No items found for this filter.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* VIEW: ACTIONS (CONSOLIDATED RESOURCES) */}
-            {viewMode === 'actions' && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* ACTIONS FILTERS */}
-                    <div className="flex justify-center mb-10">
-                        <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-200">
-                            <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
-                            <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
-                            <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
-                        </div>
-                    </div>
-
-                    <ActionCenterView cards={cards} />
-                </div>
-            )}
-
-        </main>
-
-        {/* RIGHT SIDE PANEL (SLIDE OVERS) */}
-        {selectedCard && (
-            <ActionPlanPanel
-                card={selectedCard}
-                profile={profile} // Pass full profile for AI context
-                onClose={() => setSelectedCard(null)}
-                onSave={(updates) => {
-                    handleUpdateCard(selectedCard.id, updates);
-                    // Don't close immediately on save to allow further editing, or close if preferred.
-                    // For a panel, usually explicit close is better, but let's keep it open to show success?
-                    // Actually, 'Save' usually implies 'Finish' in this context. Let's keep it open if it's "Save", close if "Done".
-                    // Logic ref: we'll just update the card live and maybe show a toast.
-                    // For now, let's keep the parent state updated but not close relevant to typical slide-over behavior.
-                    // However, to refresh the `cards` list, `selectedCard` needs to update? No, handleUpdateCard updates profile.
-                    // To keep UI in sync, we might need to re-fetch or re-calc. `cards` is memoized on profile.
-                    // We will update the `selectedCard` prop by closing/reopening? 
-                    // Better: The panel manages its own local state which initializes from props.
-                    // When we save, we push to DB. Next time it opens, it pulls new data.
-                }}
-            />
-        )}
-    </div>
-);
+        </div>
+    );
 }
 
 // --- SUB-COMPONENTS ---
