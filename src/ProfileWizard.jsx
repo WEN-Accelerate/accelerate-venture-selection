@@ -116,8 +116,14 @@ export default function ProfileWizard() {
         growthLead: "",
         keyPersonnel: "",
         strategyDescription: "",
-        strategyDimensions: { product: "", proposition: "", place: "", promotion: "" }
+        strategyDescription: "",
+        strategyDimensions: { product: "", proposition: "", place: "", promotion: "" },
+        supportDetails: {} // { "Product_MVP": "WF", "Product_Design": "Self" }
     });
+
+    const [hypotheticalExamples, setHypotheticalExamples] = useState({ domestic: "", international: "" });
+    const [onePageSummary, setOnePageSummary] = useState("");
+    const [onePageLoading, setOnePageLoading] = useState(false);
 
     // Chat State
     const [chatMessages, setChatMessages] = useState([
@@ -259,26 +265,79 @@ export default function ProfileWizard() {
         setLoading(false);
     };
 
-    // --- STEP 6: SUPPORT OPTIONS ---
-    const supportOptions = [
-        { id: 'Product', label: 'Help in Product', icon: Target },
-        { id: 'Money', label: 'Help in Money', icon: DollarSign },
-        { id: 'Placement', label: 'Help in Placement', icon: Globe },
-        { id: 'Selling', label: 'Help in Selling', icon: Sparkles },
-        { id: 'People', label: 'Help in People', icon: Users },
-        { id: 'Process', label: 'Help in Process', icon: Building2 },
-    ];
+    // --- STEP 4 HELPERS ---
+    const generateHypotheticalExamples = async () => {
+        if (hypotheticalExamples.domestic) return; // Already loaded
+        setLoading(true);
+        const prompt = `
+            Context: Company ${profile.companyName}, Industry: ${profile.industry}, Product: ${profile.products}.
+            Generate 2 hypothetical expansion scenarios (2 sentences each):
+            1. Domestic Expansion Scenario
+            2. International Expansion Scenario
+            
+            Return JSON: { "domestic": "string", "international": "string" }
+        `;
+        try {
+            const raw = await callGemini(prompt);
+            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+            const data = JSON.parse(clean);
+            setHypotheticalExamples({
+                domestic: data.domestic || "Expand to adjacent cities...",
+                international: data.international || "Export to Southeast Asia..."
+            });
+        } catch (e) {
+            console.error(e);
+        }
+        setLoading(false);
+    }
 
-    const toggleSupport = (id) => {
-        setProfile(prev => {
-            const exists = prev.supportNeeded.includes(id);
-            return {
-                ...prev,
-                supportNeeded: exists
-                    ? prev.supportNeeded.filter(x => x !== id)
-                    : [...prev.supportNeeded, id]
-            };
-        });
+    useEffect(() => {
+        if (step === 4) generateHypotheticalExamples();
+        if (step === 9) generateOnePager();
+    }, [step]);
+
+    // --- STEP 8: SUPPORT DETAILS ---
+    const SUPPORT_SUB_DOMAINS = {
+        'Product': ['MVP Definition', 'UX/UI Design', 'Tech Stack & Architecture', 'Roadmap Planning', 'User Testing'],
+        'Money': ['Valuation', 'Pitch Deck Creation', 'Investor Connect', 'Grant Application', 'Financial Modeling'],
+        'Placement': ['Channel Strategy', 'Partner Identification', 'Logistics Setup', 'Contract Negotiation', 'Warehousing'],
+        'Selling': ['Sales Scripting', 'Lead Generation', 'CRM Setup', 'Sales Training', 'Closing Strategies'],
+        'People': ['Org Structure Design', 'Hiring Key Roles', 'ESOP Planning', 'Culture Building', 'Performance Mgmt'],
+        'Process': ['Legal & Compliance', 'Accounting Setup', 'Agile Implementation', 'KPI Dashboards', 'Operations Manuals']
+    };
+
+    const handleSupportDetailChange = (category, subItem, value) => {
+        setProfile(prev => ({
+            ...prev,
+            supportDetails: {
+                ...prev.supportDetails,
+                [`${category}_${subItem}`]: value
+            }
+        }));
+    };
+
+    const handleLearnMoreCategory = async (category) => {
+        const prompt = `Explain briefly what "Help in ${category}" entails for a generic startup in 2 sentences.`;
+        const res = await callGemini(prompt);
+        alert(`${category} Help:\n\n${res}`);
+    };
+
+    const generateOnePager = async () => {
+        setOnePageLoading(true);
+        const prompt = `
+            Generate a "One Page Executive Summary" for ${profile.companyName}'s expansion strategy.
+            Data:
+            - Goal: Reach ${profile.growthTarget} in 4 years.
+            - Strategy: ${profile.ventureType} Expansion.
+            - Description: ${profile.strategyDescription}
+            - 4Ps: ${JSON.stringify(profile.strategyDimensions)}
+            - Help Needed: ${Object.entries(profile.supportDetails).filter(([k, v]) => v === 'WF').map(([k]) => k).join(', ')}
+
+            Format as a cohesive narrative (approx 200 words).
+        `;
+        const res = await callGemini(prompt);
+        setOnePageSummary(res);
+        setOnePageLoading(false);
     };
 
     const handleChatSubmit = async () => {
@@ -614,44 +673,47 @@ export default function ProfileWizard() {
 
                 {/* STEP 4: EXPANSION STRATEGY (Venture Type) */}
                 {step === 4 && (
-                    <StepContainer title="Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
+                    <StepContainer title={`Define ${profile.ventureType} Strategy`} onBack={handleBack} aiContext={aiContext}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div
-                                onClick={() => {
-                                    setProfile({ ...profile, ventureType: 'Domestic' });
-                                    handleLearnMore('Domestic');
-                                }}
-                                className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'Domestic' ? 'border-red-600 bg-red-50' : 'border-gray-100 bg-white hover:border-red-200'}`}
-                            >
-                                <div className="p-3 bg-orange-100 text-orange-600 rounded-full"><Building2 /></div>
-                                <h3 className="font-bold text-lg">Domestic Expansion</h3>
-                                <p className="text-sm text-gray-500">Deepen market share within current geography.</p>
+                            {/* DOMESTIC SIDE */}
+                            <div className="space-y-4">
+                                <div
+                                    onClick={() => setProfile({ ...profile, ventureType: 'Domestic' })}
+                                    className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'Domestic' ? 'border-red-600 bg-red-50' : 'border-gray-100 bg-white hover:border-red-200'}`}
+                                >
+                                    <div className="p-3 bg-orange-100 text-orange-600 rounded-full"><Building2 /></div>
+                                    <h3 className="font-bold text-lg">Domestic Expansion</h3>
+                                    <p className="text-sm text-gray-500">Deepen market share within current geography.</p>
+                                </div>
+                                {hypotheticalExamples.domestic && (
+                                    <div className="bg-white p-4 rounded-xl border border-dashed border-gray-300 text-xs text-gray-600 italic">
+                                        <span className="font-bold block not-italic mb-1 text-gray-800">Hypothetical Example:</span>
+                                        "{hypotheticalExamples.domestic}"
+                                    </div>
+                                )}
                             </div>
 
-                            <div
-                                onClick={() => {
-                                    setProfile({ ...profile, ventureType: 'International' });
-                                    handleLearnMore('International');
-                                }}
-                                className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'International' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 bg-white hover:border-indigo-200'}`}
-                            >
-                                <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Globe /></div>
-                                <h3 className="font-bold text-lg">International Expansion</h3>
-                                <p className="text-sm text-gray-500">Enter new global markets using exports or direct entry.</p>
+                            {/* INTERNATIONAL SIDE */}
+                            <div className="space-y-4">
+                                <div
+                                    onClick={() => setProfile({ ...profile, ventureType: 'International' })}
+                                    className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'International' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 bg-white hover:border-indigo-200'}`}
+                                >
+                                    <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Globe /></div>
+                                    <h3 className="font-bold text-lg">International Expansion</h3>
+                                    <p className="text-sm text-gray-500">Enter new global markets using exports or direct entry.</p>
+                                </div>
+                                {hypotheticalExamples.international && (
+                                    <div className="bg-white p-4 rounded-xl border border-dashed border-gray-300 text-xs text-gray-600 italic">
+                                        <span className="font-bold block not-italic mb-1 text-gray-800">Hypothetical Example:</span>
+                                        "{hypotheticalExamples.international}"
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <button key="next4" onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
                             Next
                         </button>
-
-                        <div className="mt-4 flex justify-center">
-                            <button
-                                onClick={() => handleLearnMore(null)}
-                                className="text-sm font-semibold text-indigo-600 flex items-center gap-2 hover:underline"
-                            >
-                                <Info size={16} /> Learn more about these options
-                            </button>
-                        </div>
                     </StepContainer>
                 )}
 
@@ -670,47 +732,73 @@ export default function ProfileWizard() {
                             </div>
 
                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">How do you want to expand?</label>
+                                <div className="relative">
+                                    <textarea
+                                        rows={3}
+                                        placeholder={`Describe your ${profile.ventureType} expansion plan...`}
+                                        value={profile.strategyDescription || ""}
+                                        onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                </div>
+                            </div>
+
+                            <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">1. Which Product/s?</label>
-                                <textarea
-                                    rows={2}
-                                    placeholder="e.g. Core SaaS Platform v2"
-                                    value={profile.strategyDimensions?.product || ""}
-                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, product: e.target.value } })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        rows={2}
+                                        placeholder="e.g. Core SaaS Platform v2"
+                                        value={profile.strategyDimensions?.product || ""}
+                                        onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, product: e.target.value } })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                </div>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">2. What Proposition?</label>
-                                <textarea
-                                    rows={2}
-                                    placeholder="e.g. Lowest cost provider for SMEs"
-                                    value={profile.strategyDimensions?.proposition || ""}
-                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, proposition: e.target.value } })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        rows={2}
+                                        placeholder="e.g. Lowest cost provider for SMEs"
+                                        value={profile.strategyDimensions?.proposition || ""}
+                                        onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, proposition: e.target.value } })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                </div>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">3. What Place (Channel)?</label>
-                                <textarea
-                                    rows={2}
-                                    placeholder="e.g. Direct Sales + Local Distributors"
-                                    value={profile.strategyDimensions?.place || ""}
-                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, place: e.target.value } })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        rows={2}
+                                        placeholder="e.g. Direct Sales + Local Distributors"
+                                        value={profile.strategyDimensions?.place || ""}
+                                        onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, place: e.target.value } })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                </div>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">4. What Promotion?</label>
-                                <textarea
-                                    rows={2}
-                                    placeholder="e.g. Digital Ads & Industry Events"
-                                    value={profile.strategyDimensions?.promotion || ""}
-                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, promotion: e.target.value } })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                />
+                                <div className="relative">
+                                    <textarea
+                                        rows={2}
+                                        placeholder="e.g. Digital Ads & Industry Events"
+                                        value={profile.strategyDimensions?.promotion || ""}
+                                        onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, promotion: e.target.value } })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                </div>
                             </div>
 
                             <button onClick={handleNext} className="w-full py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors mt-4">
@@ -922,21 +1010,52 @@ export default function ProfileWizard() {
 
                 {/* STEP 8: HELP NEEDED */}
                 {step === 8 && (
-                    <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
-                        <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {supportOptions.map(opt => (
-                                <div
-                                    key={opt.id}
-                                    onClick={() => toggleSupport(opt.id)}
-                                    className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center gap-3 ${profile.supportNeeded.includes(opt.id) ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
-                                >
-                                    <opt.icon size={18} className={profile.supportNeeded.includes(opt.id) ? 'text-red-600' : 'text-gray-400'} />
-                                    <span className={`text-sm font-semibold ${profile.supportNeeded.includes(opt.id) ? 'text-red-900' : 'text-gray-600'}`}>{opt.label}</span>
+                    <StepContainer title={`Support Assessment`} onBack={handleBack} aiContext={aiContext}>
+                        <p className="text-gray-500 mb-6 text-sm">Review your capabilities across these 6 key dimensions.</p>
+
+                        <div className="space-y-8">
+                            {Object.entries(SUPPORT_SUB_DOMAINS).map(([category, subItems]) => (
+                                <div key={category} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+                                        <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                                            {category}
+                                        </h3>
+                                        <button
+                                            onClick={() => handleLearnMoreCategory(category)}
+                                            className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded flex items-center gap-1 hover:bg-indigo-100"
+                                        >
+                                            <Sparkles size={12} /> Explain
+                                        </button>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {subItems.map(item => {
+                                            const val = profile.supportDetails?.[`${category}_${item}`] || 'NA';
+                                            return (
+                                                <div key={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                                                    <span className="text-gray-600 font-medium">{item}</span>
+                                                    <div className="flex bg-gray-50 p-1 rounded-lg">
+                                                        {['WF', 'Self', 'NA'].map(opt => (
+                                                            <button
+                                                                key={opt}
+                                                                onClick={() => handleSupportDetailChange(category, item, opt)}
+                                                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${val === opt
+                                                                    ? (opt === 'WF' ? 'bg-[#D32F2F] text-white shadow-sm' : (opt === 'Self' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600'))
+                                                                    : 'text-gray-400 hover:text-gray-600'}`}
+                                                            >
+                                                                {opt === 'WF' ? 'Wadhwani' : opt}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                        <button onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+
+                        <button onClick={handleNext} className="w-full mt-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
                             Next
                         </button>
                     </StepContainer>
@@ -947,20 +1066,35 @@ export default function ProfileWizard() {
                     <StepContainer title="Summary & Submission" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
                             <div className="bg-gray-50 p-6 rounded-xl space-y-4 shadow-inner">
-                                <h3 className="font-bold text-gray-900 border-b pb-2">Strategy Summary</h3>
-                                <p className="text-sm text-gray-700">
-                                    <span className="font-bold">Goal:</span> Reach <span className="text-emerald-600 font-bold">{profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}</span> in 4 years via <span className="text-indigo-600 font-bold">{profile.ventureType} Expansion</span>.
-                                </p>
+                                <h3 className="font-bold text-gray-900 border-b pb-2">One-Page Strategy</h3>
 
-                                <div>
-                                    <h4 className="font-bold text-xs uppercase text-gray-500 mb-2">Help Required In:</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {profile.supportNeeded.length > 0 ? profile.supportNeeded.map(id => (
-                                            <span key={id} className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">
-                                                {supportOptions.find(o => o.id === id)?.label || id}
-                                            </span>
-                                        )) : <span className="text-gray-400 text-xs text-italic">None selected</span>}
+                                {onePageLoading ? (
+                                    <div className="p-8 flex justify-center"><Loader2 className="animate-spin text-red-600" /></div>
+                                ) : (
+                                    <div className="prose prose-sm max-w-none text-gray-700">
+                                        <p className="whitespace-pre-wrap">{onePageSummary}</p>
                                     </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                                    <div className="text-2xl font-bold text-red-700">
+                                        {Object.values(profile.supportDetails).filter(v => v === 'WF').length}
+                                    </div>
+                                    <div className="text-xs font-bold text-red-900 uppercase">Wadhwani Support</div>
+                                </div>
+                                <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
+                                    <div className="text-2xl font-bold text-gray-800">
+                                        {Object.values(profile.supportDetails).filter(v => v === 'Self').length}
+                                    </div>
+                                    <div className="text-xs font-bold text-gray-600 uppercase">Self Managed</div>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-gray-200">
+                                    <div className="text-2xl font-bold text-gray-400">
+                                        {Object.values(profile.supportDetails).filter(v => v === 'NA').length}
+                                    </div>
+                                    <div className="text-xs font-bold text-gray-400 uppercase">Not Applicable</div>
                                 </div>
                             </div>
 
