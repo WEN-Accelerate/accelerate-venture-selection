@@ -298,6 +298,12 @@ export default function DashboardMain() {
                             >
                                 Create New Profile
                             </a>
+                            <button
+                                onClick={handleLogout}
+                                className="w-full py-3 border border-gray-300 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-all mb-4"
+                            >
+                                Log Out
+                            </button>
                         </>
                     )}
 

@@ -561,8 +561,13 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    netlifyIdentity.logout();
-    restart();
+    if (user && user.isAnonymous) {
+      localStorage.removeItem('accelerate_guest_id');
+      localStorage.removeItem('user_profile_data');
+      restart();
+    } else {
+      netlifyIdentity.logout();
+    }
   };
 
   // --- LOGIC HANDLERS ---

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
     ArrowRight, Sparkles, Building2, Users, DollarSign,
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
-    Mic, MessageSquare, Send, Info, X
+    Mic, MessageSquare, Send, Info, X, LogOut
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -148,6 +148,7 @@ export default function ProfileWizard() {
         }
 
         // Listen for Login during wizard usage
+        // Listen for Login during wizard usage
         netlifyIdentity.on('login', (u) => {
             setUser({
                 uid: u.id,
@@ -156,7 +157,26 @@ export default function ProfileWizard() {
             });
         });
 
+        netlifyIdentity.on('logout', () => {
+            setUser(null);
+            window.location.href = '/index.html';
+        });
+
+        return () => {
+            netlifyIdentity.off('login');
+            netlifyIdentity.off('logout');
+        };
     }, []);
+
+    const handleLogout = () => {
+        if (user && user.isAnonymous) {
+            localStorage.removeItem('accelerate_guest_id');
+            localStorage.removeItem('user_profile_data');
+            window.location.href = '/index.html';
+        } else {
+            netlifyIdentity.logout();
+        }
+    };
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -547,17 +567,26 @@ export default function ProfileWizard() {
                     <div className="h-6 w-px bg-gray-300 mx-1"></div>
                     <span className="font-semibold text-gray-700 tracking-tight">Venture Profile</span>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                        Step {step} of 9
+                <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end gap-1">
+                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                            Step {step} of 9
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-[#D32F2F] to-[#F57C00] transition-all duration-300 ease-out"
+                                style={{ width: `${(step / 9) * 100}%` }}
+                            ></div>
+                        </div>
                     </div>
-                    {/* Progress Bar */}
-                    <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-gradient-to-r from-[#D32F2F] to-[#F57C00] transition-all duration-300 ease-out"
-                            style={{ width: `${(step / 9) * 100}%` }}
-                        ></div>
-                    </div>
+                    <button
+                        onClick={handleLogout}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-neutral-100 rounded-full transition-all"
+                        title="Log Out"
+                    >
+                        <LogOut size={20} />
+                    </button>
                 </div>
             </header>
 
