@@ -30,7 +30,26 @@ export default function DashboardMain() {
                 setUser(currentUser);
                 fetchProfile(currentUser.uid);
             } else {
-                // If not logged in, try to find local data or redirect (logic borrowed from Wizard)
+                // If not logged in, first check if we have a Guest ID (from Wizard)
+                const guestId = localStorage.getItem('accelerate_guest_id');
+                if (guestId) {
+                    console.log("Found Guest ID:", guestId);
+                    // Try determining if this guest has a profile in Supabase
+                    const { data, error } = await supabase
+                        .from('profiles')
+                        .select('details')
+                        .eq('user_id', guestId)
+                        .maybeSingle();
+
+                    if (data && data.details) {
+                        setUser({ uid: guestId, isAnonymous: true });
+                        setProfile(data.details);
+                        setLoading(false);
+                        return;
+                    }
+                }
+
+                // Fallback: Check for local data blob (legacy or offline support)
                 const localData = localStorage.getItem('user_profile_data');
                 if (localData) {
                     const parsed = JSON.parse(localData);
@@ -39,8 +58,7 @@ export default function DashboardMain() {
                     setProfile(parsed.details);
                     setLoading(false);
                 } else {
-                    // Redirect to login if needed, or just show loading/error
-                    // For now, let's just wait or show empty
+                    // Start fresh or show error
                     setLoading(false);
                 }
             }
@@ -192,8 +210,8 @@ const FilterButton = ({ label, active, onClick }) => (
     <button
         onClick={onClick}
         className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${active
-                ? 'bg-[#D32F2F] text-white shadow-md transform scale-105'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-white'
+            ? 'bg-[#D32F2F] text-white shadow-md transform scale-105'
+            : 'text-gray-500 hover:text-gray-900 hover:bg-white'
             }`}
     >
         {label === 'ALL' ? 'Everything' : label}

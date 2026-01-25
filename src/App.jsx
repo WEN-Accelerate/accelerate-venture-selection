@@ -426,6 +426,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [loginInProgress, setLoginInProgress] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // AI States
   const [aiModal, setAiModal] = useState({ open: false, title: '', content: '', loading: false });
@@ -455,6 +456,7 @@ export default function App() {
   // --- PROFILE SYNC ---
   useEffect(() => {
     if (user && !authLoading) {
+      setProfileLoading(true); // Start blocking UI while we check profile
       const checkProfile = async () => {
         try {
           // Fetch profile for the current user
@@ -475,6 +477,7 @@ export default function App() {
               description: data.details.products ? `${data.details.products}. Target: ${data.details.customers}` : prev.description,
               expansionIdeas: data.details.ventureType ? `Expand to ${data.details.ventureType} markets` : prev.expansionIdeas
             }));
+            setProfileLoading(false); // Valid profile, show app
           } else {
             // CHECK LOCAL STORAGE FALLBACK
             const localData = localStorage.getItem('user_profile_data');
@@ -491,17 +494,22 @@ export default function App() {
                 description: details.products ? `${details.products}. Target: ${details.customers}` : prev.description,
                 expansionIdeas: details.ventureType ? `Expand to ${details.ventureType} markets` : prev.expansionIdeas
               }));
+              setProfileLoading(false); // Valid local profile, show app
               return; // Found local data, stop here
             }
 
             // No profile found ANYWHERE, redirect to wizard
             // Check if we are just starting (step 1)
             if (step === 1 && !window.location.search.includes('skip')) {
+              // Redirecting... keep profileLoading true to prevent flash
               window.location.href = '/profile.html';
+            } else {
+              setProfileLoading(false); // Just show the empty form if we are not redirecting
             }
           }
         } catch (err) {
           console.warn("Profile sync error:", err);
+          setProfileLoading(false); // Error fallback, show app
         }
       };
 
@@ -753,7 +761,7 @@ export default function App() {
       1. Analyze the business context and their specific expansion ideas.
       2. Select the top 3 most relevant archetypes from the list.
       3. For each selected archetype, write a specific 1-2 sentence explanation ("reasoning") of why it fits this company's goals and ideas perfectly. 
-         Use "Because you want to [reference idea]..." style phrasing.
+         Use "Because you want to [reference idea]" style phrasing.
       4. Return strictly valid JSON array of objects: [{ "id": number, "reasoning": "string" }].
       Do not include markdown formatting or code blocks. Just the raw JSON.
     `;
@@ -901,11 +909,13 @@ export default function App() {
     return <LoginScreen onLogin={handleLogin} loading={loginInProgress} />;
   }
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
         <Loader2 className={`w-12 h-12 ${BRAND_COLORS.textDark} animate-spin mb-4`} />
-        <h3 className="text-xl font-bold text-gray-800">Analyzing your Growth DNA...</h3>
+        <h3 className="text-xl font-bold text-gray-800">
+          {profileLoading ? "Syncing your profile..." : "Analyzing your Growth DNA..."}
+        </h3>
         <p className="text-gray-500 mt-2">Connecting with Wadhwani Accelerate Intelligence</p>
       </div>
     );
