@@ -7,17 +7,9 @@ import {
 } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import netlifyIdentity from 'netlify-identity-widget';
 
-// --- FIREBASE SETUP ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-// Fallback for dev if __firebase_config is missing
-if (!firebaseConfig.apiKey) {
-    console.warn("Firebase Config missing in wizard, using mock.");
-}
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// --- CONFIG ---
 
 // --- CONFIG ---
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
@@ -139,19 +131,32 @@ export default function ProfileWizard() {
     const [user, setUser] = useState(null);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-            } else {
-                // If not logged in, maybe redirect back to login? 
-                // For now, we allow guest access but saving might need an ID.
-                // We generate a random one if guest.
-                const guestId = localStorage.getItem('accelerate_guest_id') || `guest_${Math.random().toString(36).substr(2, 9)}`;
-                localStorage.setItem('accelerate_guest_id', guestId);
-                setUser({ uid: guestId, isAnonymous: true });
-            }
+        // Initialize Netlify Identity
+        netlifyIdentity.init();
+
+        const currentUser = netlifyIdentity.currentUser();
+        if (currentUser) {
+            setUser({
+                uid: currentUser.id, // Map Netlify ID to uid for consistency
+                email: currentUser.email,
+                isAnonymous: false
+            });
+        } else {
+            // Guest Logic
+            const guestId = localStorage.getItem('accelerate_guest_id') || `guest_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('accelerate_guest_id', guestId);
+            setUser({ uid: guestId, isAnonymous: true });
+        }
+
+        // Listen for Login during wizard usage
+        netlifyIdentity.on('login', (u) => {
+            setUser({
+                uid: u.id,
+                email: u.email,
+                isAnonymous: false
+            });
         });
-        return () => unsubscribe();
+
     }, []);
 
     const handleNext = () => setStep(prev => prev + 1);
