@@ -22,6 +22,7 @@ export default function DashboardMain() {
     const [profile, setProfile] = useState(null);
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
+    const [selectedCard, setSelectedCard] = useState(null); // For Modal
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {

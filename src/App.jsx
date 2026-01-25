@@ -509,49 +509,46 @@ export default function App() {
       setProfileLoading(true); // Start blocking UI while we check profile
       const checkProfile = async () => {
         try {
-          // Fetch profile for the current user
-          const { data, error } = await supabase
+          // 1. Try fetching profile for the current user
+          let { data, error } = await supabase
             .from('profiles')
             .select('details')
             .eq('user_id', user.uid)
             .maybeSingle();
 
+          // 2. Fallback: If no profile and user is anonymous, check for a Guest ID from a previous session
+          if ((!data || !data.details) && user.isAnonymous) {
+            const guestId = localStorage.getItem('accelerate_guest_id');
+            if (guestId) {
+              console.log("Checking for previous guest session:", guestId);
+              const guestResult = await supabase
+                .from('profiles')
+                .select('details')
+                .eq('user_id', guestId)
+                .maybeSingle();
+
+              if (guestResult.data && guestResult.data.details) {
+                data = guestResult.data;
+              }
+            }
+          }
+
           if (data && data.details) {
-            // Profile found in DB
-            setBusinessData(prev => ({
-              ...prev,
-              name: data.details.companyName || prev.name,
-              industry: data.details.industry || prev.industry,
-              revenue: data.details.revenue || prev.revenue,
-              employees: data.details.employees || prev.employees,
-              description: data.details.products ? `${data.details.products}. Target: ${data.details.customers}` : prev.description,
-              expansionIdeas: data.details.ventureType ? `Expand to ${data.details.ventureType} markets` : prev.expansionIdeas
-            }));
-            setProfileLoading(false); // Valid profile, show app
+            // Profile found in DB -> Redirect to Dashboard
+            console.log("Profile found, redirecting to Dashboard...");
+            window.location.href = '/dashboard.html';
           } else {
             // CHECK LOCAL STORAGE FALLBACK
             const localData = localStorage.getItem('user_profile_data');
             if (localData) {
-              const parsed = JSON.parse(localData);
-              const details = parsed.details;
-              console.log("Using local fallback profile");
-              setBusinessData(prev => ({
-                ...prev,
-                name: details.companyName || prev.name,
-                industry: details.industry || prev.industry,
-                revenue: details.revenue || prev.revenue,
-                employees: details.employees || prev.employees,
-                description: details.products ? `${details.products}. Target: ${details.customers}` : prev.description,
-                expansionIdeas: details.ventureType ? `Expand to ${details.ventureType} markets` : prev.expansionIdeas
-              }));
-              setProfileLoading(false); // Valid local profile, show app
-              return; // Found local data, stop here
+              // Local data exists, assuming valid session -> Dashboard
+              console.log("Local profile found, redirecting to Dashboard...");
+              window.location.href = '/dashboard.html';
+              return;
             }
 
             // No profile found ANYWHERE, redirect to wizard
-            // Check if we are just starting (step 1)
             if (step === 1 && !window.location.search.includes('skip')) {
-              // Redirecting... keep profileLoading true to prevent flash
               window.location.href = '/profile.html';
             } else {
               setProfileLoading(false); // Just show the empty form if we are not redirecting
@@ -559,7 +556,7 @@ export default function App() {
           }
         } catch (err) {
           console.warn("Profile sync error:", err);
-          setProfileLoading(false); // Error fallback, show app
+          setProfileLoading(false); // Error fallback
         }
       };
 
