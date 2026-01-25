@@ -5,6 +5,7 @@ import {
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
     Mic, MessageSquare, Send, Info, X
 } from 'lucide-react';
+import { GoogleGenAI, SchemaType } from "@google/genai";
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -153,42 +154,71 @@ export default function ProfileWizard() {
         if (!profile.companyName) return;
         setLoading(true);
 
-        // Simulate scraping via LLM knowledge
-        const prompt = `
-      Act as a business intelligence analyst. 
-      I am analysing the company "${profile.companyName}".
-      Based on your training data or by simulating a web search, extract or infer the following details:
-      1. Primary Industry
-      2. Key Products/Services
-      3. Target Customers
-      4. Estimated Number of Employees
-      5. Key Personnel / Directors / Founders (Names)
-      
-      Return strictly JSON:
-      {
-        "industry": "string",
-        "products": "string",
-        "customers": "string",
-        "employees": "string",
-        "keyPersonnel": "string"
-      }
-    `;
-
-        const result = await callGemini(prompt);
         try {
-            const cleaned = result.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(cleaned);
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+            // Use the new Google Gen AI SDK for deep research with Grounding
+            const ai = new GoogleGenAI({ apiKey });
+
+            const prompt = `Perform comprehensive research on the company: "${profile.companyName}". 
+            Provide details for the following fields:
+            - Exact Legal Name
+            - Industry Category
+            - Detailed Description of Business
+            - Promoter/Founder/Director Details
+            - GST Number (if publicly available)
+            - Key Products/Services Offered
+            - Primary Customer Segments (B2B, B2C, target audience)
+            - Estimated Employee Count (Approximate range)
+            - Current Market Standing
+            
+            Be as factual as possible using search results.`;
+
+            const response = await ai.models.generateContent({
+                model: "gemini-2.0-flash-exp",
+                contents: prompt,
+                config: {
+                    tools: [{ googleSearch: {} }],
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: SchemaType.OBJECT,
+                        properties: {
+                            name: { type: SchemaType.STRING },
+                            industry: { type: SchemaType.STRING },
+                            description: { type: SchemaType.STRING },
+                            promoters: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                            products: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                            customers: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+                            marketPosition: { type: SchemaType.STRING },
+                            employees: { type: SchemaType.STRING }
+                        },
+                        required: ["name", "industry", "description", "promoters", "products", "customers", "employees"]
+                    }
+                }
+            });
+
+            // Handle potential null/undefined text
+            const rawText = response.text || "{}";
+            const data = JSON.parse(rawText);
+
             setProfile(prev => ({
                 ...prev,
-                ...data,
-                // Pre-fill growth lead if we found a person, just as a suggestion
-                growthLead: data.keyPersonnel ? data.keyPersonnel.split(',')[0] : prev.growthLead
+                companyName: data.name || prev.companyName,
+                industry: data.industry || "",
+                products: data.products?.join(", ") || "",
+                customers: data.customers?.join(", ") || "",
+                employees: data.employees || "",
+                keyPersonnel: data.promoters?.join(", ") || "",
+                // Heuristic: If we found promoters, use the first one as potential lead suggestion
+                growthLead: (data.promoters && data.promoters.length > 0) ? data.promoters[0] : prev.growthLead
             }));
-            setAiContext(`Analyzed ${profile.companyName}: Found ${data.industry} company. Key people: ${data.keyPersonnel || 'N/A'}.`);
+
+            setAiContext(`Analyzed ${data.name || profile.companyName}. Industry: ${data.industry}. Position: ${data.marketPosition || 'N/A'}`);
             setStep(2);
+
         } catch (e) {
-            console.error("Parse error", e);
-            // Fallback
+            console.error("Deep Research Error", e);
+            // Fallback to simple simulation or just proceed
+            setAiContext(`Could not auto-analyze. Please fill manually.`);
             setStep(2);
         }
         setLoading(false);
