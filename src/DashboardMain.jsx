@@ -4,7 +4,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import {
     Target, User, Calendar, ExternalLink, Filter,
-    BookOpen, MessageCircle, X, Check, Save, Loader2
+    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe
 } from 'lucide-react';
 
 // --- CONFIG ---
@@ -171,8 +171,72 @@ export default function DashboardMain() {
                 </div>
             </header>
 
+            {/* STRATEGY SNAPSHOT */}
+            <main className="max-w-7xl mx-auto px-8 pt-8 pb-4">
+                <div className="bg-gray-900 text-white rounded-[2rem] p-8 shadow-2xl relative overflow-hidden mb-8">
+                    {/* Decorative elements */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
+
+                    <div className="relative z-10">
+                        {/* Top Row */}
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/10 pb-6 gap-6">
+                            <div>
+                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
+                                    <Target size={14} className="text-red-500" /> Strategic Direction
+                                </label>
+                                <div className="flex items-center gap-3 text-3xl font-black tracking-tight text-white">
+                                    {profile.ventureType === 'Domestic' ?
+                                        <Building2 size={32} className="text-orange-400" /> :
+                                        <Globe size={32} className="text-indigo-400" />
+                                    }
+                                    {profile.ventureType} Expansion
+                                </div>
+                            </div>
+                            <div className="text-left md:text-right bg-white/5 p-4 rounded-xl border border-white/10">
+                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">4-Year Revenue Target</label>
+                                <div className="text-3xl font-black text-emerald-400">
+                                    {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div className="mb-8">
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-3">Core Strategy Statement</label>
+                            <p className="text-lg text-gray-200 leading-relaxed font-light border-l-4 border-red-500 pl-6 italic">
+                                "{profile.strategyDescription || 'No summary provided.'}"
+                            </p>
+                        </div>
+
+                        {/* 4Ps Grid */}
+                        <div>
+                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-4">Execution Framework (4Ps)</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Product</div>
+                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.product || '-'}</div>
+                                </div>
+                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Proposition</div>
+                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.proposition || '-'}</div>
+                                </div>
+                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Channel (Place)</div>
+                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.place || '-'}</div>
+                                </div>
+                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
+                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Promotion</div>
+                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.promotion || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
             {/* GRID */}
-            <main className="max-w-7xl mx-auto p-8">
+            <main className="max-w-7xl mx-auto px-8 pb-20">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {cards.map(card => (
                         <KaizenCard
