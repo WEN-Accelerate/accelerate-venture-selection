@@ -4,7 +4,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import {
     Target, User, Calendar, ExternalLink, Filter,
-    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe
+    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles
 } from 'lucide-react';
 
 // --- CONFIG ---
@@ -187,71 +187,131 @@ export default function DashboardMain() {
             {/* MAIN CONTENT AREA */}
             <main className="max-w-7xl mx-auto px-8 pt-8 pb-20">
 
-                {/* VIEW: CONTEXT (STRATEGY SNAPSHOT) */}
+                {/* VIEW: CONTEXT (STRATEGY BLUEPRINT) */}
                 {viewMode === 'context' && (
-                    <div className="bg-gray-900 text-white rounded-[2rem] p-10 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* Decorative elements */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                        <div className="relative z-10">
-                            {/* Top Row */}
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 border-b border-white/10 pb-8 gap-6">
+                        {/* 1. HEADER CARD */}
+                        <div className="bg-gray-900 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Sparkles className="text-yellow-400 w-4 h-4" />
+                                    <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-400 uppercase">Strategic Blueprint</span>
+                                </div>
+                                <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
+                                <p className="text-gray-400 text-sm">Review your expansion roadmap before proceeding.</p>
+                            </div>
+                        </div>
+
+                        {/* 2. ORGANIZATION PROFILE */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <Building2 className="text-gray-400" size={20} />
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Organization Profile</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
                                 <div>
-                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-2 mb-3">
-                                        <Target size={14} className="text-red-500" /> Strategic Direction
-                                    </label>
-                                    <div className="flex items-center gap-4 text-4xl font-black tracking-tight text-white">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Industry</label>
+                                    <div className="font-semibold text-gray-900">{profile.industry || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Employees</label>
+                                    <div className="font-semibold text-gray-900">{profile.employees || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Personnel</label>
+                                    <div className="font-semibold text-gray-900">{profile.keyPersonnel || '-'}</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Target Customer</label>
+                                    <div className="font-semibold text-gray-900 leading-relaxed text-sm">{profile.customers || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Products</label>
+                                    <div className="font-semibold text-gray-900 leading-relaxed text-sm">{profile.products || '-'}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. FINANCIAL BASELINE */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <CreditCard className="text-gray-400" size={20} />
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Financial Baseline</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Current Revenue</label>
+                                    <div className="text-3xl font-black text-gray-900">{profile.revenue || '-'}</div>
+                                </div>
+                                <div className="flex flex-col md:items-end">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Profitability Status</label>
+                                    <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
+                                        profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-600'
+                                        }`}>
+                                        {profile.profitability || 'Unknown'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 4. EXPANSION STRATEGY (Restyled) */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-3 mb-6 border-b border-gray-100 pb-4">
+                                <TrendingUp className="text-gray-400" size={20} />
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest">Expansion Strategy</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                                <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Venture Type</label>
+                                    <div className="flex items-center gap-3">
                                         {profile.ventureType === 'Domestic' ?
-                                            <Building2 size={40} className="text-orange-400" /> :
-                                            <Globe size={40} className="text-indigo-400" />
+                                            <Building2 size={24} className="text-orange-500" /> :
+                                            <Globe size={24} className="text-indigo-500" />
                                         }
-                                        {profile.ventureType} Expansion
+                                        <span className="text-xl font-bold text-gray-900">{profile.ventureType} Expansion</span>
                                     </div>
                                 </div>
-                                <div className="text-left md:text-right bg-white/5 p-6 rounded-2xl border border-white/10 shadow-inner">
-                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2">4-Year Revenue Target</label>
-                                    <div className="text-4xl font-black text-emerald-400 tracking-tighter">
+                                <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">4-Year Revenue Target</label>
+                                    <div className="text-2xl font-black text-emerald-600">
                                         {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Description */}
-                            <div className="mb-10">
-                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-4">Core Strategy Statement</label>
-                                <p className="text-xl text-gray-200 leading-relaxed font-light border-l-4 border-red-500 pl-8 italic">
+                            <div className="mb-8">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-3">Core Strategy Statement</label>
+                                <p className="text-sm text-gray-600 leading-relaxed border-l-4 border-red-500 pl-4 italic bg-gray-50 py-3 pr-3 rounded-r-lg">
                                     "{profile.strategyDescription || 'No summary provided.'}"
                                 </p>
                             </div>
 
-                            {/* 4Ps Grid */}
                             <div>
-                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-5">Execution Framework (4Ps)</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
-                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Product
-                                        </div>
-                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.product || '-'}</div>
+                                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-4">Execution Framework (4Ps)</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Product</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.product || '-'}</div>
                                     </div>
-                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
-                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Proposition
-                                        </div>
-                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.proposition || '-'}</div>
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Proposition</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.proposition || '-'}</div>
                                     </div>
-                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
-                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Channel (Place)
-                                        </div>
-                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.place || '-'}</div>
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Channel (Place)</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.place || '-'}</div>
                                     </div>
-                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
-                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Promotion
-                                        </div>
-                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.promotion || '-'}</div>
+                                    <div className="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] text-indigo-600 font-bold uppercase mb-2">Promotion</div>
+                                        <div className="text-sm font-medium text-gray-800 leading-snug">{profile.strategyDimensions?.promotion || '-'}</div>
                                     </div>
                                 </div>
                             </div>
