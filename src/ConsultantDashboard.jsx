@@ -50,11 +50,12 @@ export default function ConsultantDashboard() {
             setUser(u);
             setConsultantProfile(data);
             fetchClients(u.email);
+            setLoading(false);
         } else {
             alert("Access Denied: You are not registered as a consultant.");
-            netlifyIdentity.logout();
+            await netlifyIdentity.logout();
+            window.location.href = '/index.html';
         }
-        setLoading(false);
     };
 
     const fetchClients = async (email) => {
