@@ -24,9 +24,7 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // WADHWANI BRAND ASSETS
-// WADHWANI BRAND ASSETS
-const WADHWANI_LOGO_URL = "https://cdn.wadhwanifoundation.org/wp-content/uploads/2023/06/WF-Logo.svg";
-// Fallback if the above fails (handled by img onerror in production, but here we stick to the official one requested or a known working one)
+const WADHWANI_LOGO_URL = "/wf-logo.png"; // Local public asset
 
 
 const BRAND_COLORS = {
