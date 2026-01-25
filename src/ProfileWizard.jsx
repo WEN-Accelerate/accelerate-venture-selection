@@ -599,6 +599,15 @@ export default function ProfileWizard() {
                                 <Sparkles size={14} className="text-indigo-500" />
                                 AI will attempt to auto-fill your profile details on the next page.
                             </p>
+
+                            <div className="pt-6 border-t border-gray-100 mt-6 text-center">
+                                <button
+                                    onClick={() => window.location.href = '/dashboard.html'}
+                                    className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+                                >
+                                    I am a Consultant / Advisor →
+                                </button>
+                            </div>
                             <button
                                 onClick={handleScrape}
                                 disabled={!profile.companyName}

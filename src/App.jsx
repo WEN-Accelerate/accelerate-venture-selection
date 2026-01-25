@@ -296,6 +296,13 @@ const LoginScreen = ({ onLogin, loading }) => {
           >
             Continue as Guest <ArrowRight size={16} />
           </button>
+
+          <button
+            onClick={() => window.location.href = '/dashboard.html'}
+            className="w-full py-3 px-4 bg-white border border-gray-200 text-indigo-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all text-sm mt-4"
+          >
+            Consultant / Admin Access
+          </button>
         </div>
 
         <p className="mt-8 text-center text-[10px] text-gray-400 leading-tight">
@@ -447,17 +454,28 @@ export default function App() {
             .eq('user_id', user.uid)
             .maybeSingle();
 
-          // 2. Fallback: If no profile and user is anonymous, check for a Guest ID from a previous session
+          // 2. Consultant check
+          const { data: consultantData } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('consultant_id', user.uid)
+            .limit(1);
+
+          if (consultantData && consultantData.length > 0) {
+            console.log("Consultant profile detected, redirecting to Dashboard...");
+            window.location.href = '/dashboard.html';
+            return;
+          }
+
+          // 3. Guest Fallback
           if ((!data || !data.details) && user.isAnonymous) {
             const guestId = localStorage.getItem('accelerate_guest_id');
             if (guestId) {
-              console.log("Checking for previous guest session:", guestId);
               const guestResult = await supabase
                 .from('profiles')
                 .select('details')
                 .eq('user_id', guestId)
                 .maybeSingle();
-
               if (guestResult.data && guestResult.data.details) {
                 data = guestResult.data;
               }
@@ -465,29 +483,24 @@ export default function App() {
           }
 
           if (data && data.details) {
-            // Profile found in DB -> Redirect to Dashboard
-            console.log("Profile found, redirecting to Dashboard...");
+            console.log("SME profile found, redirecting to Dashboard...");
             window.location.href = '/dashboard.html';
           } else {
-            // CHECK LOCAL STORAGE FALLBACK
             const localData = localStorage.getItem('user_profile_data');
             if (localData) {
-              // Local data exists, assuming valid session -> Dashboard
-              console.log("Local profile found, redirecting to Dashboard...");
               window.location.href = '/dashboard.html';
               return;
             }
 
-            // No profile found ANYWHERE, redirect to wizard
             if (step === 1 && !window.location.search.includes('skip')) {
               window.location.href = '/profile.html';
             } else {
-              setProfileLoading(false); // Just show the empty form if we are not redirecting
+              setProfileLoading(false);
             }
           }
         } catch (err) {
           console.warn("Profile sync error:", err);
-          setProfileLoading(false); // Error fallback
+          setProfileLoading(false);
         }
       };
 
