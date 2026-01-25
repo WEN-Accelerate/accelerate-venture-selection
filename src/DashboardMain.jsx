@@ -197,13 +197,22 @@ export default function DashboardMain() {
 
         // Save to DB
         if (user && !user.isAnonymous) {
-            await supabase.from('profiles').upsert([{
+            console.log("Saving profile to Supabase...", user.uid);
+            const { error } = await supabase.from('profiles').upsert([{
                 user_id: user.uid,
                 details: newProfile,
                 updated_at: new Date()
             }], { onConflict: 'user_id' });
+
+            if (error) {
+                console.error("Supabase Save Error:", error);
+                alert("Failed to save changes to cloud. Please check connection.");
+            } else {
+                console.log("Supabase Save Success.");
+            }
         } else {
             // Local save
+            console.log("Saving profile to LocalStorage (Guest)...");
             localStorage.setItem('user_profile_data', JSON.stringify({ details: newProfile }));
         }
     };
@@ -627,6 +636,22 @@ const KaizenCard = ({ card, onClick }) => {
                         {card.description}
                     </p>
                 )}
+            </div>
+
+            {/* Metadata Fields */}
+            <div className="space-y-3 mb-6 bg-gray-50/50 p-3 rounded-xl border border-gray-100/50">
+                <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-400 uppercase tracking-wider">Target Date</span>
+                    <span className={`font-bold ${card.dueDate ? 'text-gray-900' : 'text-gray-300'}`}>
+                        {card.dueDate || 'PENDING'}
+                    </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-400 uppercase tracking-wider">Ownership</span>
+                    <span className={`font-bold ${card.owner ? 'text-gray-900' : 'text-gray-300'}`}>
+                        {card.owner || 'UNASSIGNED'}
+                    </span>
+                </div>
             </div>
 
             {/* Separator */}
