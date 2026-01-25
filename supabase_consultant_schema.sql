@@ -9,8 +9,8 @@ ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'sme' CHECK (role IN ('sme', 'consult
 
 -- 2. Create consultants table for consultant-specific data
 CREATE TABLE IF NOT EXISTS consultants (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id TEXT UNIQUE NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id TEXT UNIQUE NOT NULL,
     consultant_name TEXT NOT NULL,
     email TEXT NOT NULL,
     phone TEXT,
@@ -18,17 +18,29 @@ CREATE TABLE IF NOT EXISTS consultants (
     bio TEXT,
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Foreign key to profiles table
+    CONSTRAINT fk_consultant_user FOREIGN KEY (user_id) 
+        REFERENCES profiles(user_id) ON DELETE CASCADE
 );
 
 -- 3. Create company_assignments table (many-to-many relationship)
 CREATE TABLE IF NOT EXISTS company_assignments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    consultant_id UUID NOT NULL REFERENCES consultants(id) ON DELETE CASCADE,
-    company_user_id TEXT NOT NULL REFERENCES profiles(user_id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    consultant_id UUID NOT NULL,
+    company_user_id TEXT NOT NULL,
     assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     assigned_by TEXT, -- admin user_id who made the assignment
     notes TEXT,
+    
+    -- Foreign keys
+    CONSTRAINT fk_assignment_consultant FOREIGN KEY (consultant_id) 
+        REFERENCES consultants(id) ON DELETE CASCADE,
+    CONSTRAINT fk_assignment_company FOREIGN KEY (company_user_id) 
+        REFERENCES profiles(user_id) ON DELETE CASCADE,
+    
+    -- Ensure unique assignments
     UNIQUE(consultant_id, company_user_id)
 );
 
