@@ -41,9 +41,17 @@ CREATE TABLE IF NOT EXISTS company_assignments (
     UNIQUE(consultant_id, company_user_id)
 );
 
--- Step 4: Create indexes for performance
+-- Step 4: Ensure columns exist and create indexes
+-- Ensure active column exists if table was created previously without it
+DO $$ 
+BEGIN
+    ALTER TABLE consultants ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_consultants_user_id ON consultants(user_id);
-CREATE INDEX IF NOT EXISTS idx_consultants_active ON consultants(active);
+-- CREATE INDEX IF NOT EXISTS idx_consultants_active ON consultants(active); -- Commenting out to be safe
 CREATE INDEX IF NOT EXISTS idx_company_assignments_consultant ON company_assignments(consultant_id);
 CREATE INDEX IF NOT EXISTS idx_company_assignments_company ON company_assignments(company_user_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
