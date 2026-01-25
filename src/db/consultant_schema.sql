@@ -72,3 +72,11 @@ CREATE POLICY "Consultant Access" ON profiles
 CREATE POLICY "Consultant Insert" ON profiles
     FOR INSERT
     WITH CHECK (auth.uid()::text = consultant_id);
+
+-- 6. Consultants Table Security (Invitation Registry)
+ALTER TABLE consultants ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read access for consultants" ON consultants;
+CREATE POLICY "Public read access for consultants" 
+    ON consultants FOR SELECT 
+    USING (true);
+

@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import {
     Users, Plus, Search, Building2, TrendingUp,
     Calendar, CheckCircle, ArrowRight, Loader2, LogOut
 } from 'lucide-react';
-import netlifyIdentity from 'netlify-identity-widget';
-
-// Config
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from './supabaseClient';
 
 export default function ConsultantDashboard({ user, onLogout }) {
     const [companies, setCompanies] = useState([]);
@@ -53,6 +47,11 @@ export default function ConsultantDashboard({ user, onLogout }) {
         c.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.industry?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const safeLogoUrl = (url) => {
+        if (!url) return null;
+        return url.replace('http://', 'https://');
+    };
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -133,7 +132,7 @@ export default function ConsultantDashboard({ user, onLogout }) {
                             <div key={company.id} className="bg-white rounded-2xl p-6 border border-gray-200 hover:shadow-xl hover:border-indigo-100 transition-all group relative overflow-hidden">
                                 {company.logoUrl && (
                                     <div className="absolute top-6 right-6 opacity-10 group-hover:opacity-100 transition-opacity">
-                                        <img src={company.logoUrl} className="w-10 h-10 object-contain" />
+                                        <img src={safeLogoUrl(company.logoUrl)} className="w-10 h-10 object-contain" />
                                     </div>
                                 )}
 

@@ -325,6 +325,11 @@ export default function DashboardMain() {
         });
     }, [profile, filter]);
 
+    const safeLogoUrl = (url) => {
+        if (!url) return null;
+        return url.replace('http://', 'https://');
+    };
+
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <Loader2 className="animate-spin text-red-600 w-12 h-12" />
@@ -482,7 +487,7 @@ export default function DashboardMain() {
                                 </div>
                                 {profile.logoUrl && (
                                     <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
-                                        <img src={profile.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                        <img src={safeLogoUrl(profile.logoUrl)} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
                                     </div>
                                 )}
                             </div>
