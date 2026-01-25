@@ -37,7 +37,7 @@ const BRAND_COLORS = {
 // --- AI HELPER ---
 const callGemini = async (prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-    const model = "gemini-2.5-flash-preview-09-2025";
+    const model = "gemini-3-flash-preview";
 
     if (!apiKey) return "AI simulation: Gemini response placeholder.";
 
@@ -345,7 +345,7 @@ export default function ProfileWizard() {
                 <div className="flex items-center gap-3">
                     <img src={WADHWANI_LOGO_URL} alt="Wadhwani Foundation" className="h-10" />
                     <div className="h-6 w-px bg-gray-300 mx-1"></div>
-                    <span className="font-semibold text-gray-700 tracking-tight">Accelerate Profile</span>
+                    <span className="font-semibold text-gray-700 tracking-tight">Venture Profile</span>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                     <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
