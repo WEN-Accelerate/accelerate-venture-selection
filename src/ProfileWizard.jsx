@@ -249,7 +249,9 @@ export default function ProfileWizard() {
             Company: ${profile.companyName}
             Industry: ${profile.industry}
             Products: ${profile.products}
-            Target Customers: ${profile.customers}
+            Customers: ${profile.customers}
+            Revenue: ${profile.revenue}
+            Employees: ${profile.employees}
 
             Task: Compare "Domestic Expansion" vs "International Expansion" for THIS specific business.
             Return a JSON array with exactly 2 objects (one for each option).
@@ -594,43 +596,59 @@ export default function ProfileWizard() {
 
                         {/* Learn More Modal (Premium Dark UI) */}
                         {/* Learn More Modal (Premium Dark UI) */}
+                        {/* Learn More Sidebar (Right Side Slide-in) */}
                         {showLearnMore && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                                <div className="bg-[#1a202c] rounded-xl max-w-5xl w-full p-8 relative shadow-2xl border border-gray-700">
-                                    <button onClick={() => setShowLearnMore(false)} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors">
-                                        <X size={24} />
+                            <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
+                                {/* Clicking outside closes it */}
+                                <div className="absolute inset-0" onClick={() => setShowLearnMore(false)}></div>
+
+                                <div className="relative w-full md:w-2/3 lg:w-1/2 h-full bg-[#1a202c] shadow-2xl border-l border-gray-700 p-8 overflow-y-auto animate-in slide-in-from-right duration-300">
+                                    <button onClick={() => setShowLearnMore(false)} className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors bg-white/10 p-2 rounded-full">
+                                        <X size={20} />
                                     </button>
 
-                                    <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                                        <Sparkles className="text-yellow-400" />
-                                        Strategic Intelligence for {profile.companyName}
+                                    <h3 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                                        <Sparkles className="text-yellow-400" size={28} />
+                                        Strategic Intelligence
                                     </h3>
+                                    <p className="text-gray-400 mb-8 border-b border-gray-700 pb-6">
+                                        Tailored expansion analysis for <span className="text-white font-semibold">{profile.companyName}</span>
+                                    </p>
 
-                                    <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="space-y-8 pb-20">
                                         {learnMoreLoading ? (
-                                            <div className="flex flex-col items-center justify-center py-12">
-                                                <Loader2 className="w-10 h-10 text-yellow-400 animate-spin mb-4" />
-                                                <p className="text-gray-400">Analyzing market context...</p>
+                                            <div className="flex flex-col items-center justify-center py-20">
+                                                <Loader2 className="w-12 h-12 text-yellow-400 animate-spin mb-4" />
+                                                <p className="text-gray-400 text-lg">Analyzing market context...</p>
                                             </div>
                                         ) : (
                                             learnMoreData?.map((item, idx) => (
-                                                <div key={idx} className="bg-[#2d3748] rounded-lg p-6 border-l-4 border-yellow-500 shadow-lg">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-xs font-bold text-yellow-500 tracking-wider uppercase">
-                                                            RECOMMENDATION {idx + 1}: {item.type}
+                                                <div key={idx} className="bg-[#2d3748] rounded-xl p-8 border-l-4 border-yellow-500 shadow-xl relative overflow-hidden group hover:bg-[#323d4e] transition-colors">
+                                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                                        {item.title.includes('DOMESTIC') ? <Building2 size={100} className="text-white" /> : <Globe size={100} className="text-white" />}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 mb-4">
+                                                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${item.type.includes('WIN') ? 'bg-green-900 text-green-300' : 'bg-purple-900 text-purple-300'} tracking-wider uppercase`}>
+                                                            {item.type}
                                                         </span>
                                                     </div>
-                                                    <h4 className="text-xl font-bold text-white mb-2">{item.title}</h4>
-                                                    <p className="text-gray-300 text-sm leading-relaxed mb-4">
-                                                        {item.recommendation}
-                                                    </p>
-                                                    <div className="bg-yellow-500/10 p-3 rounded flex items-start gap-3">
-                                                        <div className="mt-1">
-                                                            <Target size={16} className="text-yellow-500" />
+
+                                                    <h4 className="text-2xl font-bold text-white mb-4">{item.title}</h4>
+
+                                                    <div className="prose prose-invert prose-sm mb-6">
+                                                        <p className="text-gray-300 leading-relaxed text-base">
+                                                            {item.recommendation}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="bg-black/20 p-4 rounded-lg flex items-start gap-4 border border-white/5">
+                                                        <div className="mt-1 bg-yellow-500/20 p-2 rounded text-yellow-500">
+                                                            <Target size={20} />
                                                         </div>
                                                         <div>
-                                                            <p className="text-[10px] font-bold text-yellow-600 uppercase mb-0.5">ESTIMATED IMPACT</p>
-                                                            <p className="text-xs text-yellow-100 font-medium">{item.impact}</p>
+                                                            <p className="text-[10px] font-bold text-yellow-500 uppercase mb-1 tracking-widest">ESTIMATED IMPACT</p>
+                                                            <p className="text-sm text-yellow-50 font-medium leading-relaxed">{item.impact}</p>
                                                         </div>
                                                     </div>
                                                 </div>
