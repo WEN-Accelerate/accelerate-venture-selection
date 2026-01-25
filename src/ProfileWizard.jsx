@@ -309,13 +309,26 @@ export default function ProfileWizard() {
     };
 
     const handleSupportDetailChange = (category, subItem, value) => {
-        setProfile(prev => ({
-            ...prev,
-            supportDetails: {
-                ...prev.supportDetails,
-                [`${category}_${subItem}`]: value
+        setProfile(prev => {
+            // Rule: Max 5 "WF" selections
+            if (value === 'WF') {
+                const currentWFCount = Object.values(prev.supportDetails).filter(v => v === 'WF').length;
+                const isAlreadyWF = prev.supportDetails[`${category}_${subItem}`] === 'WF';
+
+                if (currentWFCount >= 5 && !isAlreadyWF) {
+                    alert("Focus limit reached! You can select a maximum of 5 areas for Wadhwani Support.");
+                    return prev;
+                }
             }
-        }));
+
+            return {
+                ...prev,
+                supportDetails: {
+                    ...prev.supportDetails,
+                    [`${category}_${subItem}`]: value
+                }
+            };
+        });
     };
 
     const handleSubItemLearnMore = async (category, subItem) => {
@@ -1011,7 +1024,7 @@ export default function ProfileWizard() {
                                     <div>
                                         <label className="text-xs text-gray-500 font-semibold uppercase">Profitability Status</label>
                                         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold mt-1 ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
-                                                profile.profitability === 'BreakEven' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                            profile.profitability === 'BreakEven' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
                                             }`}>
                                             {profile.profitability || '-'}
                                         </div>
@@ -1176,24 +1189,88 @@ export default function ProfileWizard() {
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4 text-center">
-                                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                                    <div className="text-2xl font-bold text-red-700">
-                                        {Object.values(profile.supportDetails).filter(v => v === 'WF').length}
+                            {/* DASHBOARD GRID FOR SUPPORT AREAS */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* BUCKET 1: WADHWANI FOCUS AREAS (High Detail) */}
+                                <div className="bg-gradient-to-br from-red-50 to-white border border-red-100 rounded-2xl p-6 shadow-sm">
+                                    <div className="flex items-center gap-3 mb-4 border-b border-red-100 pb-3">
+                                        <div className="bg-red-600 text-white p-2 rounded-lg shadow-sm">
+                                            <Target size={20} />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 leading-tight">Focus Areas</h4>
+                                            <p className="text-[10px] text-red-600 font-bold uppercase tracking-wider">Wadhwani Support (Max 5)</p>
+                                        </div>
+                                        <span className="ml-auto text-3xl font-black text-red-600/20">
+                                            {Object.values(profile.supportDetails).filter(v => v === 'WF').length}/5
+                                        </span>
                                     </div>
-                                    <div className="text-xs font-bold text-red-900 uppercase">Wadhwani Support</div>
+
+                                    <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                        {Object.entries(profile.supportDetails).filter(([_, v]) => v === 'WF').length > 0 ? (
+                                            Object.entries(profile.supportDetails)
+                                                .filter(([_, v]) => v === 'WF')
+                                                .map(([key]) => {
+                                                    const [cat, item] = key.split('_');
+                                                    return (
+                                                        <div key={key} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-red-50 shadow-sm hover:shadow-md transition-all">
+                                                            <CheckCircle size={16} className="text-red-500 shrink-0" />
+                                                            <div>
+                                                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{cat}</div>
+                                                                <div className="text-sm font-bold text-gray-800">{item}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                        ) : (
+                                            <div className="text-center py-6 text-gray-400 italic text-sm border-2 border-dashed border-red-100 rounded-xl bg-white/50">
+                                                No focus areas selected yet.
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="bg-gray-100 p-4 rounded-xl border border-gray-200">
-                                    <div className="text-2xl font-bold text-gray-800">
-                                        {Object.values(profile.supportDetails).filter(v => v === 'Self').length}
+
+                                {/* BUCKET 2: IN-HOUSE & NA (Summarized) */}
+                                <div className="space-y-4">
+                                    {/* Self Managed */}
+                                    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col h-[calc(50%-0.5rem)]">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="bg-gray-100 text-gray-600 p-1.5 rounded-md">
+                                                <Users size={16} />
+                                            </div>
+                                            <h4 className="font-bold text-gray-700 text-sm uppercase tracking-wide">In-House Execution</h4>
+                                            <span className="ml-auto text-xs font-bold bg-gray-100 px-2 py-1 rounded-full text-gray-600">
+                                                {Object.values(profile.supportDetails).filter(v => v === 'Self').length}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 content-start overflow-y-auto custom-scrollbar flex-1">
+                                            {Object.entries(profile.supportDetails).filter(([_, v]) => v === 'Self').length > 0 ? (
+                                                Object.entries(profile.supportDetails).filter(([_, v]) => v === 'Self').map(([key]) => (
+                                                    <span key={key} className="text-[10px] font-semibold bg-gray-50 border border-gray-100 px-2 py-1 rounded text-gray-600">
+                                                        {key.split('_')[1]}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <span className="text-xs text-gray-300 italic">None selected</span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="text-xs font-bold text-gray-600 uppercase">Self Managed</div>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-gray-200">
-                                    <div className="text-2xl font-bold text-gray-400">
-                                        {Object.values(profile.supportDetails).filter(v => v === 'NA').length}
+
+                                    {/* Not Applicable */}
+                                    <div className="bg-gray-50 border border-dashed border-gray-300 rounded-2xl p-6 opacity-75 h-[calc(50%-0.5rem)]">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="p-1.5 rounded text-gray-400">
+                                                <Info size={16} />
+                                            </div>
+                                            <h4 className="font-bold text-gray-400 text-sm uppercase tracking-wide">Not Applicable</h4>
+                                            <span className="ml-auto text-xs font-bold bg-gray-200 px-2 py-1 rounded-full text-gray-500">
+                                                {Object.values(profile.supportDetails).filter(v => v === 'NA').length}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-gray-400 leading-snug">
+                                            These support dimensions were marked as not relevant for the current strategy phase.
+                                        </div>
                                     </div>
-                                    <div className="text-xs font-bold text-gray-400 uppercase">Not Applicable</div>
                                 </div>
                             </div>
 
