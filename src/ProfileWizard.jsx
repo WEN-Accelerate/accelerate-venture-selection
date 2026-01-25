@@ -25,7 +25,7 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // WADHWANI BRAND ASSETS
-const WADHWANI_LOGO_URL = "/wf-logo.png"; // Local public asset
+const WADHWANI_LOGO_URL = "/Logo WF.png"; // Local public asset
 
 
 const BRAND_COLORS = {
@@ -115,7 +115,8 @@ export default function ProfileWizard() {
         commitmentHours: "",
         growthLead: "",
         keyPersonnel: "",
-        strategyDescription: ""
+        strategyDescription: "",
+        strategyDimensions: { product: "", proposition: "", place: "", promotion: "" }
     });
 
     // Chat State
@@ -260,12 +261,12 @@ export default function ProfileWizard() {
 
     // --- STEP 6: SUPPORT OPTIONS ---
     const supportOptions = [
-        { id: 'Product', label: 'Help with Product', icon: Target },
-        { id: 'Plan', label: 'Help with Plan', icon: Sparkles },
-        { id: 'Sales', label: 'Help with Sales', icon: DollarSign },
-        { id: 'People', label: 'Help with People', icon: Users },
-        { id: 'Process', label: 'Help Fix Process', icon: Building2 },
-        { id: 'Money', label: 'Help Get Money', icon: DollarSign },
+        { id: 'Product', label: 'Help in Product', icon: Target },
+        { id: 'Money', label: 'Help in Money', icon: DollarSign },
+        { id: 'Placement', label: 'Help in Placement', icon: Globe },
+        { id: 'Selling', label: 'Help in Selling', icon: Sparkles },
+        { id: 'People', label: 'Help in People', icon: Users },
+        { id: 'Process', label: 'Help in Process', icon: Building2 },
     ];
 
     const toggleSupport = (id) => {
@@ -347,6 +348,41 @@ export default function ProfileWizard() {
             }]);
         }
         setLearnMoreLoading(false);
+    };
+
+    const handleSuggestDimensions = async () => {
+        setLoading(true);
+        const prompt = `
+            Act as a Strategy Consultant for ${profile.companyName} (${profile.industry}).
+            Expansion Type: ${profile.ventureType}.
+            
+            Define the 4 Dimensions of their expansion strategy:
+            1. Which Product/s? (What to sell)
+            2. What Proposition? (Value prop)
+            3. What Place? (Channel/Geo)
+            4. What Promotion? (Marketing)
+
+            Return JSON: { "product": "...", "proposition": "...", "place": "...", "promotion": "..." }
+        `;
+        try {
+            const raw = await callGemini(prompt);
+            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+            const data = JSON.parse(clean);
+            setProfile(prev => ({
+                ...prev,
+                strategyDimensions: {
+                    product: data.product || prev.strategyDimensions.product,
+                    proposition: data.proposition || prev.strategyDimensions.proposition,
+                    place: data.place || prev.strategyDimensions.place,
+                    promotion: data.promotion || prev.strategyDimensions.promotion
+                }
+            }));
+            setAiContext("Generated 4Ps Strategy.");
+        } catch (e) {
+            console.error(e);
+            setAiContext("Could not generate strategy. Please fill manually.");
+        }
+        setLoading(false);
     };
 
     // --- FINAL SAVE ---
@@ -576,57 +612,8 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 4: GROWTH ASPIRATION */}
+                {/* STEP 4: EXPANSION STRATEGY (Venture Type) */}
                 {step === 4 && (
-                    <StepContainer title="Growth Ambition" onBack={handleBack} aiContext={aiContext}>
-                        <div className="text-center mb-8">
-                            <div className="inline-block p-4 bg-red-50 text-[#D32F2F] rounded-full mb-4">
-                                <Target size={32} />
-                            </div>
-                            <p className="text-gray-600 font-medium">Enter your revenue goal (in USD) for 3 years from now.</p>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Target Revenue Goal</label>
-                            <div className="relative">
-                                <DollarSign className="absolute left-4 top-4 text-gray-400" size={20} />
-                                <input
-                                    type="text"
-                                    value={profile.growthTarget}
-                                    onChange={e => {
-                                        // Numeric validation
-                                        const val = e.target.value.replace(/[^0-9.]/g, '');
-                                        setProfile({ ...profile, growthTarget: val });
-                                    }}
-                                    onBlur={() => {
-                                        // Format on blur
-                                        if (profile.growthTarget && !profile.growthTarget.includes('M')) {
-                                            // Simple formatter placeholder
-                                        }
-                                    }}
-                                    className="w-full text-2xl p-4 pl-12 bg-white border-2 border-gray-200 rounded-xl focus:border-[#D32F2F] outline-none shadow-sm placeholder:text-gray-300 font-bold"
-                                    placeholder="15,000,000"
-                                />
-                                {profile.growthTarget && !isNaN(profile.growthTarget) && (
-                                    <p className="text-xs text-green-600 mt-2 font-medium">
-                                        Reads as: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(profile.growthTarget)}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleNext}
-                            disabled={!profile.growthTarget}
-                            className="w-full mt-8 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100 disabled:opacity-50"
-                        >
-                            Set Goal
-                        </button>
-                    </StepContainer>
-                )}
-
-                {/* STEP 5: VENTURE TYPE */}
-                {step === 5 && (
                     <StepContainer title="Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div
@@ -637,7 +624,7 @@ export default function ProfileWizard() {
                                 className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'Domestic' ? 'border-red-600 bg-red-50' : 'border-gray-100 bg-white hover:border-red-200'}`}
                             >
                                 <div className="p-3 bg-orange-100 text-orange-600 rounded-full"><Building2 /></div>
-                                <h3 className="font-bold text-lg">Expand Domestically</h3>
+                                <h3 className="font-bold text-lg">Domestic Expansion</h3>
                                 <p className="text-sm text-gray-500">Deepen market share within current geography.</p>
                             </div>
 
@@ -649,12 +636,12 @@ export default function ProfileWizard() {
                                 className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'International' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 bg-white hover:border-indigo-200'}`}
                             >
                                 <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Globe /></div>
-                                <h3 className="font-bold text-lg">Go International</h3>
+                                <h3 className="font-bold text-lg">International Expansion</h3>
                                 <p className="text-sm text-gray-500">Enter new global markets using exports or direct entry.</p>
                             </div>
                         </div>
-                        <button key="next5" onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                            Confirm Strategy
+                        <button key="next4" onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                            Next
                         </button>
 
                         <div className="mt-4 flex justify-center">
@@ -665,6 +652,108 @@ export default function ProfileWizard() {
                                 <Info size={16} /> Learn more about these options
                             </button>
                         </div>
+                    </StepContainer>
+                )}
+
+                {/* STEP 5: 4 DIMENSIONS */}
+                {step === 5 && (
+                    <StepContainer title="Define Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <p className="text-gray-500 text-sm">Define your strategy across 4 key dimensions.</p>
+                                <button
+                                    onClick={handleSuggestDimensions}
+                                    className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-1"
+                                >
+                                    <Sparkles size={12} /> Auto-Fill with AI
+                                </button>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">1. Which Product/s?</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="e.g. Core SaaS Platform v2"
+                                    value={profile.strategyDimensions?.product || ""}
+                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, product: e.target.value } })}
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">2. What Proposition?</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="e.g. Lowest cost provider for SMEs"
+                                    value={profile.strategyDimensions?.proposition || ""}
+                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, proposition: e.target.value } })}
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">3. What Place (Channel)?</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="e.g. Direct Sales + Local Distributors"
+                                    value={profile.strategyDimensions?.place || ""}
+                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, place: e.target.value } })}
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">4. What Promotion?</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="e.g. Digital Ads & Industry Events"
+                                    value={profile.strategyDimensions?.promotion || ""}
+                                    onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, promotion: e.target.value } })}
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                />
+                            </div>
+
+                            <button onClick={handleNext} className="w-full py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors mt-4">
+                                Continue
+                            </button>
+                        </div>
+                    </StepContainer>
+                )}
+
+                {/* STEP 6: REVENUE TARGET */}
+                {step === 6 && (
+                    <StepContainer title="Target Revenue" onBack={handleBack} aiContext={aiContext}>
+                        <div className="text-center mb-8">
+                            <div className="inline-block p-4 bg-red-50 text-[#D32F2F] rounded-full mb-4">
+                                <Target size={32} />
+                            </div>
+                            <p className="text-gray-600 font-medium">What is your target revenue in 4 years?</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Target Revenue (4 Years)</label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-4 top-4 text-gray-400" size={20} />
+                                <input
+                                    type="text"
+                                    value={profile.growthTarget}
+                                    onChange={e => {
+                                        const val = e.target.value.replace(/[^0-9.]/g, '');
+                                        setProfile({ ...profile, growthTarget: val });
+                                    }}
+                                    className="w-full text-2xl p-4 pl-12 bg-white border-2 border-gray-200 rounded-xl focus:border-[#D32F2F] outline-none shadow-sm placeholder:text-gray-300 font-bold"
+                                    placeholder="e.g. 5000000"
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={handleNext}
+                            disabled={!profile.growthTarget}
+                            className="w-full mt-8 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100 disabled:opacity-50"
+                        >
+                            Set Target
+                        </button>
                     </StepContainer>
                 )}
 
@@ -782,156 +871,119 @@ export default function ProfileWizard() {
                 )}
 
 
-                {/* STEP 6: STRATEGY DESCRIPTION (NEW) */}
-                {
-                    step === 6 && (
-                        <StepContainer title="Describe your Strategy" onBack={handleBack} aiContext={aiContext}>
-                            <div className="space-y-6">
-                                <p className="text-gray-600 text-sm">Tell us more about how you plan to execute this. Use the AI chat for help.</p>
+                {/* STEP 7: SHOW STRATEGY (REVIEW) */}
+                {step === 7 && (
+                    <StepContainer title="Review Your Strategy" onBack={handleBack} aiContext={aiContext}>
+                        <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
 
-                                <div className="relative">
-                                    <textarea
-                                        rows={4}
-                                        value={profile.strategyDescription}
-                                        onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
-                                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none pr-12"
-                                        placeholder="e.g. We plan to partner with local distributors..."
-                                    />
-                                    <button className="absolute right-4 bottom-4 p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors" title="Record Voice">
-                                        <Mic size={20} />
-                                    </button>
+                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                <Sparkles className="text-yellow-400" size={18} />
+                                {profile.companyName} Venture Strategy
+                            </h3>
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between border-b border-gray-700 pb-2">
+                                    <span className="text-gray-400 text-sm">Type</span>
+                                    <span className="font-semibold">{profile.ventureType} Expansion</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-700 pb-2">
+                                    <span className="text-gray-400 text-sm">Target (4yr)</span>
+                                    <span className="font-semibold text-emerald-400">
+                                        {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                    </span>
                                 </div>
 
-                                {/* AI Chat Interface */}
-                                <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                                    <div className="flex items-center gap-2 mb-3 text-indigo-800 font-bold text-xs uppercase tracking-wide">
-                                        <Sparkles size={14} /> AI Strategy Assistant
+                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div className="bg-white/10 p-3 rounded-lg">
+                                        <div className="text-[10px] uppercase text-gray-400 tracking-wider mb-1">Product</div>
+                                        <div className="text-sm font-medium">{profile.strategyDimensions?.product}</div>
                                     </div>
-                                    <div className="h-32 overflow-y-auto mb-3 space-y-2 pr-2">
-                                        {chatMessages.map((msg, i) => (
-                                            <div key={i} className={`text-sm p-2 rounded-lg ${msg.role === 'user' ? 'bg-white ml-auto max-w-[80%]' : 'bg-indigo-100 mr-auto max-w-[90%]'}`}>
-                                                {msg.text}
-                                            </div>
-                                        ))}
+                                    <div className="bg-white/10 p-3 rounded-lg">
+                                        <div className="text-[10px] uppercase text-gray-400 tracking-wider mb-1">Proposition</div>
+                                        <div className="text-sm font-medium">{profile.strategyDimensions?.proposition}</div>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={chatInput}
-                                            onChange={e => setChatInput(e.target.value)}
-                                            onKeyDown={e => e.key === 'Enter' && handleChatSubmit()}
-                                            className="flex-1 p-2 text-sm border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-400"
-                                            placeholder="Ask for suggestions..."
-                                        />
-                                        <button onClick={handleChatSubmit} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                                            <Send size={16} />
-                                        </button>
+                                    <div className="bg-white/10 p-3 rounded-lg">
+                                        <div className="text-[10px] uppercase text-gray-400 tracking-wider mb-1">Channel</div>
+                                        <div className="text-sm font-medium">{profile.strategyDimensions?.place}</div>
+                                    </div>
+                                    <div className="bg-white/10 p-3 rounded-lg">
+                                        <div className="text-[10px] uppercase text-gray-400 tracking-wider mb-1">Promotion</div>
+                                        <div className="text-sm font-medium">{profile.strategyDimensions?.promotion}</div>
                                     </div>
                                 </div>
-
-                                <button onClick={handleNext} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                                    Next
-                                </button>
                             </div>
-                        </StepContainer>
-                    )
-                }
+                        </div>
+                        <button onClick={handleNext} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors">
+                            Looks Good, Continue
+                        </button>
+                    </StepContainer>
+                )}
 
-                {/* STEP 7: SUPPORT NEEDED */}
-                {
-                    step === 7 && (
-                        <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
-                            <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {supportOptions.map(opt => (
-                                    <div
-                                        key={opt.id}
-                                        onClick={() => toggleSupport(opt.id)}
-                                        className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center gap-3 ${profile.supportNeeded.includes(opt.id) ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
-                                    >
-                                        <opt.icon size={18} className={profile.supportNeeded.includes(opt.id) ? 'text-red-600' : 'text-gray-400'} />
-                                        <span className={`text-sm font-semibold ${profile.supportNeeded.includes(opt.id) ? 'text-red-900' : 'text-gray-600'}`}>{opt.label}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <button onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                                Next
-                            </button>
-                        </StepContainer>
-                    )
-                }
-
-                {/* STEP 8: COMMITMENT */}
-                {
-                    step === 8 && (
-                        <StepContainer title="Commitment Check" onBack={handleBack} aiContext={aiContext}>
-                            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                                <h3 className="font-bold text-gray-900 mb-4">Are you willing to dedicate 4-6 hours per week specifically to drive this initiative?</h3>
-                                <div className="space-y-3">
-                                    <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
-                                        <input
-                                            type="radio"
-                                            name="commitment"
-                                            value="Yes"
-                                            onChange={e => setProfile({ ...profile, commitmentHours: e.target.value })}
-                                            checked={profile.commitmentHours === 'Yes'}
-                                            className="w-5 h-5 text-red-600"
-                                        />
-                                        <span className="font-medium">Yes, I am fully committed.</span>
-                                    </label>
-                                    <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
-                                        <input
-                                            type="radio"
-                                            name="commitment"
-                                            value="No"
-                                            onChange={e => setProfile({ ...profile, commitmentHours: e.target.value })}
-                                            checked={profile.commitmentHours === 'No'}
-                                            className="w-5 h-5 text-red-600"
-                                        />
-                                        <span className="font-medium">No, I can't spare that much time right now.</span>
-                                    </label>
+                {/* STEP 8: HELP NEEDED */}
+                {step === 8 && (
+                    <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
+                        <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {supportOptions.map(opt => (
+                                <div
+                                    key={opt.id}
+                                    onClick={() => toggleSupport(opt.id)}
+                                    className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center gap-3 ${profile.supportNeeded.includes(opt.id) ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                                >
+                                    <opt.icon size={18} className={profile.supportNeeded.includes(opt.id) ? 'text-red-600' : 'text-gray-400'} />
+                                    <span className={`text-sm font-semibold ${profile.supportNeeded.includes(opt.id) ? 'text-red-900' : 'text-gray-600'}`}>{opt.label}</span>
                                 </div>
-                            </div>
-                            <button
-                                onClick={handleNext}
-                                disabled={!profile.commitmentHours}
-                                className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-50"
-                            >
-                                Almost Done
-                            </button>
-                        </StepContainer>
-                    )
-                }
+                            ))}
+                        </div>
+                        <button onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                            Next
+                        </button>
+                    </StepContainer>
+                )}
 
-                {/* STEP 9: TEAM */}
-                {
-                    step === 9 && (
-                        <StepContainer title="Assign a Growth Lead" onBack={handleBack} aiContext={aiContext}>
-                            <div className="space-y-6">
-                                <p className="text-gray-600 text-sm">Success requires ownership. Who will be the dedicated 'Growth Lead' from your team to own the sprint deliverables?</p>
+                {/* STEP 9: SUMMARY & SUBMIT */}
+                {step === 9 && (
+                    <StepContainer title="Summary & Submission" onBack={handleBack} aiContext={aiContext}>
+                        <div className="space-y-6">
+                            <div className="bg-gray-50 p-6 rounded-xl space-y-4 shadow-inner">
+                                <h3 className="font-bold text-gray-900 border-b pb-2">Strategy Summary</h3>
+                                <p className="text-sm text-gray-700">
+                                    <span className="font-bold">Goal:</span> Reach <span className="text-emerald-600 font-bold">{profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}</span> in 4 years via <span className="text-indigo-600 font-bold">{profile.ventureType} Expansion</span>.
+                                </p>
 
                                 <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Lead Name / Role</label>
-                                    <input
-                                        type="text"
-                                        value={profile.growthLead}
-                                        onChange={e => setProfile({ ...profile, growthLead: e.target.value })}
-                                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-lg"
-                                        placeholder="e.g. Sarah J. (Marketing Head)"
-                                    />
+                                    <h4 className="font-bold text-xs uppercase text-gray-500 mb-2">Help Required In:</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {profile.supportNeeded.length > 0 ? profile.supportNeeded.map(id => (
+                                            <span key={id} className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-semibold">
+                                                {supportOptions.find(o => o.id === id)?.label || id}
+                                            </span>
+                                        )) : <span className="text-gray-400 text-xs text-italic">None selected</span>}
+                                    </div>
                                 </div>
-
-                                <button
-                                    onClick={handleSave}
-                                    disabled={!profile.growthLead}
-                                    className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 hover:shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    <Save size={20} /> Complete Profile & Launch
-                                </button>
                             </div>
-                        </StepContainer>
-                    )
-                }
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Additional Description / Context</label>
+                                <textarea
+                                    rows={3}
+                                    value={profile.strategyDescription}
+                                    onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
+                                    className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                                    placeholder="Any specific challenges or details about your strategy..."
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleSave}
+                                className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-center gap-2"
+                            >
+                                <Save size={20} /> Submit & Launch
+                            </button>
+                        </div>
+                    </StepContainer>
+                )}
 
             </div >
         </div >
