@@ -32,12 +32,7 @@ import {
   Download
 } from 'lucide-react';
 
-import { createClient } from '@supabase/supabase-js';
-
-// --- SUPABASE SETUP ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from './supabaseClient';
 
 const BRAND_COLORS = {
   red: 'bg-[#D32F2F]', // Wadhwani Red Anchor

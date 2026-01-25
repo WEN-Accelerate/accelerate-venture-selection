@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
@@ -9,11 +8,7 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import ConsultantDashboard from './ConsultantDashboard';
 
-// --- CONFIG ---
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from './supabaseClient';
 
 export default function DashboardMain() {
     const [user, setUser] = useState(null);

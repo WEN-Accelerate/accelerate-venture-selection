@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import {
     ArrowRight, Sparkles, Building2, Users, DollarSign,
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
@@ -9,12 +8,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 import netlifyIdentity from 'netlify-identity-widget';
 
-// --- CONFIG ---
-
-// --- CONFIG ---
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from './supabaseClient';
 
 // WADHWANI BRAND ASSETS
 const WADHWANI_LOGO_URL = "/Logo WF.png"; // Local public asset
