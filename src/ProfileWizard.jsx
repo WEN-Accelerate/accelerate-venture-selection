@@ -685,10 +685,10 @@ export default function ProfileWizard() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                            Annual Revenue <Info size={14} className="text-gray-400" />
+                                            Annual Revenue (INR Cr) <Info size={14} className="text-gray-400" />
                                         </label>
                                         <div className="relative">
-                                            <DollarSign className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                                            <span className="absolute left-4 top-3.5 text-gray-400 font-bold">₹</span>
                                             <select
                                                 value={profile.revenue}
                                                 onChange={e => setProfile({ ...profile, revenue: e.target.value })}
@@ -878,13 +878,13 @@ export default function ProfileWizard() {
                             <div className="inline-block p-4 bg-red-50 text-[#D32F2F] rounded-full mb-4">
                                 <Target size={32} />
                             </div>
-                            <p className="text-gray-600 font-medium">What is your target revenue in 4 years?</p>
+                            <p className="text-gray-600 font-medium">What is your target revenue (INR Cr) in 4 years?</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">Target Revenue (4 Years)</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Target Revenue (INR Cr)</label>
                             <div className="relative">
-                                <DollarSign className="absolute left-4 top-4 text-gray-400" size={20} />
+                                <span className="absolute left-4 top-4 text-gray-400 font-bold">₹</span>
                                 <input
                                     type="text"
                                     value={profile.growthTarget}
@@ -892,8 +892,8 @@ export default function ProfileWizard() {
                                         const val = e.target.value.replace(/[^0-9.]/g, '');
                                         setProfile({ ...profile, growthTarget: val });
                                     }}
-                                    className="w-full text-2xl p-4 pl-12 bg-white border-2 border-gray-200 rounded-xl focus:border-[#D32F2F] outline-none shadow-sm placeholder:text-gray-300 font-bold"
-                                    placeholder="e.g. 5000000"
+                                    className="w-full text-2xl p-4 pl-10 bg-white border-2 border-gray-200 rounded-xl focus:border-[#D32F2F] outline-none shadow-sm placeholder:text-gray-300 font-bold"
+                                    placeholder="e.g. 50"
                                 />
                             </div>
                         </div>
@@ -912,24 +912,24 @@ export default function ProfileWizard() {
 
                 {/* --- GLOBAL AI PANEL (Rendered outside StepContainer for stacking context) --- */}
                 {showLearnMore && (
-                    <div className="fixed top-0 right-0 h-full w-full md:w-[45%] bg-[#0f172a] shadow-2xl z-[100] border-l border-gray-800 animate-in slide-in-from-right duration-500 flex flex-col">
+                    <div className="fixed top-0 right-0 h-full w-full md:w-[45%] bg-white shadow-2xl z-[100] border-l border-gray-200 animate-in slide-in-from-right duration-500 flex flex-col">
 
                         {/* Header Section */}
-                        <div className="sticky top-0 bg-[#0f172a]/95 backdrop-blur z-10 px-8 py-6 border-b border-gray-800 flex justify-between items-start">
+                        <div className="sticky top-0 bg-[#D32F2F] z-10 px-8 py-6 shadow-md flex justify-between items-start">
                             <div>
-                                <div className="flex items-center gap-2 mb-2 text-yellow-500 font-bold text-xs tracking-widest uppercase">
+                                <div className="flex items-center gap-2 mb-2 text-white/80 font-bold text-xs tracking-widest uppercase">
                                     <Sparkles size={14} /> Strategic Intelligence
                                 </div>
                                 <h3 className="text-2xl font-bold text-white leading-tight">
                                     Contextual Analysis
                                 </h3>
-                                <p className="text-gray-400 text-sm mt-1">
-                                    For <span className="text-white font-medium">{profile.companyName}</span>
+                                <p className="text-white/80 text-sm mt-1">
+                                    For <span className="font-medium">{profile.companyName}</span>
                                 </p>
                             </div>
                             <button
                                 onClick={() => setShowLearnMore(false)}
-                                className="absolute top-6 right-6 text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
+                                className="absolute top-6 right-6 text-white/60 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
                                 title="Close Panel"
                             >
                                 <X size={24} />
@@ -937,31 +937,30 @@ export default function ProfileWizard() {
                         </div>
 
                         {/* Scrollable Content */}
-                        <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar bg-gray-50">
                             {learnMoreLoading ? (
                                 <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
                                     <div className="relative">
-                                        <div className="absolute inset-0 bg-yellow-500 blur-xl opacity-20 animate-pulse"></div>
-                                        <Loader2 className="relative w-16 h-16 text-yellow-500 animate-spin" />
+                                        <div className="absolute inset-0 bg-red-500 blur-xl opacity-20 animate-pulse"></div>
+                                        <Loader2 className="relative w-16 h-16 text-[#D32F2F] animate-spin" />
                                     </div>
-                                    <p className="mt-8 text-gray-400 font-medium text-lg animate-pulse">
+                                    <p className="mt-8 text-gray-500 font-medium text-lg animate-pulse">
                                         Synthesizing market data...
                                     </p>
-                                    <p className="text-gray-600 text-sm mt-2">Comparing growth vectors for your industry</p>
                                 </div>
                             ) : (
                                 learnMoreData?.map((item, idx) => (
-                                    <div key={idx} className="bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5 mb-4">
+                                    <div key={idx} className="bg-white rounded-2xl p-6 border border-gray-200 hover:border-red-400 transition-all shadow-sm hover:shadow-md mb-4">
                                         <div className="flex justify-between items-start mb-2">
-                                            <h4 className="text-lg font-bold text-white">{item.title}</h4>
-                                            <span className="bg-white/10 text-white text-[10px] px-2 py-1 rounded-full uppercase tracking-wider">Scenario {idx + 1}</span>
+                                            <h4 className="text-lg font-bold text-gray-900">{item.title}</h4>
+                                            <span className="bg-red-50 text-[#D32F2F] text-[10px] px-2 py-1 rounded-full uppercase tracking-wider font-bold">Scenario {idx + 1}</span>
                                         </div>
-                                        <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                                        <p className="text-gray-600 text-sm mb-4 leading-relaxed">
                                             {item.recommendation}
                                         </p>
                                         <button
                                             onClick={() => handleSelectStrategy(item.recommendation)}
-                                            className="w-full text-center py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-lg text-sm transition-colors"
+                                            className="w-full text-center py-2 bg-gray-900 hover:bg-[#D32F2F] text-white font-bold rounded-lg text-sm transition-colors"
                                         >
                                             Select This Strategy
                                         </button>
@@ -971,8 +970,8 @@ export default function ProfileWizard() {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 border-t border-gray-800 bg-[#0f172a] text-center">
-                            <p className="text-xs text-gray-500">
+                        <div className="p-6 border-t border-gray-200 bg-white text-center">
+                            <p className="text-xs text-gray-400">
                                 AI inputs based on {profile.industry} trends & public market data.
                             </p>
                         </div>
@@ -985,14 +984,14 @@ export default function ProfileWizard() {
                     <StepContainer title="Review Your Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
                             {/* 1. HEADER CARD */}
-                            <div className="bg-gradient-to-r from-gray-900 to-slate-800 p-6 rounded-2xl text-white shadow-lg relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                            <div className="bg-gradient-to-r from-[#D32F2F] to-[#b71c1c] p-6 rounded-2xl text-white shadow-lg relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                                 <div className="relative z-10">
-                                    <div className="flex items-center gap-2 text-yellow-500 font-bold text-xs tracking-widest uppercase mb-2">
+                                    <div className="flex items-center gap-2 text-yellow-300 font-bold text-xs tracking-widest uppercase mb-2">
                                         <Sparkles size={12} /> Strategic Blueprint
                                     </div>
                                     <h2 className="text-3xl font-bold mb-1">{profile.companyName}</h2>
-                                    <p className="text-gray-400 text-sm">Review your expansion roadmap before proceeding.</p>
+                                    <p className="text-white/80 text-sm">Review your expansion roadmap before proceeding.</p>
                                 </div>
                             </div>
 
@@ -1332,7 +1331,7 @@ export default function ProfileWizard() {
                             <div className="pt-4">
                                 <button
                                     onClick={handleSave}
-                                    className="w-full py-4 bg-gray-900 text-white font-bold rounded-xl shadow-lg hover:bg-black transition-all flex items-center justify-center gap-2 text-lg hover:scale-[1.005]"
+                                    className="w-full py-4 bg-[#D32F2F] text-white font-bold rounded-xl shadow-lg hover:bg-[#b71c1c] transition-all flex items-center justify-center gap-2 text-lg hover:scale-[1.005]"
                                 >
                                     <Save size={20} /> Finalize Submission
                                 </button>
@@ -1341,6 +1340,6 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

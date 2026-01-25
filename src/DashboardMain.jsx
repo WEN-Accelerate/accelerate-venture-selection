@@ -306,23 +306,23 @@ export default function DashboardMain() {
                     </div>
 
                     {/* CENTER: VIEW MODE TOGGLE */}
-                    <div className="bg-gray-100 p-1 rounded-xl flex gap-1 shadow-inner relative">
+                    <div className="bg-white border border-gray-200 p-1 rounded-full flex gap-1 shadow-sm">
                         <button
                             onClick={() => setViewMode('context')}
-                            className={`px - 6 py - 2 rounded - lg text - xs font - black uppercase tracking - widest transition - all duration - 300 flex items - center gap - 2 ${viewMode === 'context'
-                                    ? 'bg-gray-900 text-white shadow-lg transform scale-105 ring-1 ring-gray-900/10'
-                                    : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
-                                } `}
+                            className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
+                                ? 'bg-[#1e293b] text-white shadow-md'
+                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                }`}
                         >
                             <Sparkles size={12} className={viewMode === 'context' ? 'text-yellow-400' : ''} />
                             Blueprint
                         </button>
                         <button
                             onClick={() => setViewMode('sprint')}
-                            className={`px - 6 py - 2 rounded - lg text - xs font - black uppercase tracking - widest transition - all duration - 300 flex items - center gap - 2 ${viewMode === 'sprint'
-                                    ? 'bg-[#D32F2F] text-white shadow-lg transform scale-105 ring-1 ring-red-900/10'
-                                    : 'text-gray-400 hover:text-red-900 hover:bg-red-50'
-                                } `}
+                            className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
+                                ? 'bg-[#D32F2F] text-white shadow-md'
+                                : 'text-gray-500 hover:text-red-700 hover:bg-red-50'
+                                }`}
                         >
                             <Target size={12} />
                             Sprint
@@ -351,16 +351,16 @@ export default function DashboardMain() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
                         {/* 1. HEADER CARD */}
-                        <div className="bg-gray-900 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                        <div className="bg-gradient-to-r from-[#D32F2F] to-[#b71c1c] text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                             <div className="relative z-10 flex items-start justify-between">
                                 <div>
                                     <div className="flex items-center gap-2 mb-2">
-                                        <Sparkles className="text-yellow-400 w-4 h-4" />
-                                        <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-400 uppercase">Strategic Blueprint</span>
+                                        <Sparkles className="text-yellow-300 w-4 h-4" />
+                                        <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase">Strategic Blueprint</span>
                                     </div>
                                     <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
-                                    <p className="text-gray-400 text-sm">Review your expansion roadmap before proceeding.</p>
+                                    <p className="text-white/80 text-sm">Review your expansion roadmap before proceeding.</p>
                                 </div>
                                 {profile.logoUrl && (
                                     <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
@@ -418,8 +418,8 @@ export default function DashboardMain() {
                                 <div className="flex flex-col md:items-end">
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Profitability Status</label>
                                     <span className={`px - 4 py - 1.5 rounded - full text - xs font - bold uppercase tracking - wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
-                                            profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
-                                                'bg-gray-100 text-gray-600'
+                                        profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
+                                            'bg-gray-100 text-gray-600'
                                         } `}>
                                         {profile.profitability || 'Unknown'}
                                     </span>
@@ -490,7 +490,7 @@ export default function DashboardMain() {
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {/* SPRINT FILTERS */}
                         <div className="flex justify-center mb-10">
-                            <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-100">
+                            <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-200">
                                 <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
                                 <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
                                 <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
@@ -539,10 +539,10 @@ export default function DashboardMain() {
 const FilterButton = ({ label, active, onClick }) => (
     <button
         onClick={onClick}
-        className={`px - 6 py - 2 rounded - full text - xs font - bold uppercase tracking - wider transition - all duration - 200 ${active
-                ? 'bg-[#D32F2F] text-white shadow-md transform scale-105'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-white'
-            } `}
+        className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${active
+            ? 'bg-[#D32F2F] text-white shadow-md transform scale-105'
+            : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+            }`}
     >
         {label === 'ALL' ? 'Everything' : label}
     </button>
