@@ -49,6 +49,9 @@ export default function DashboardMain() {
                 displayName: currentUser.user_metadata?.full_name,
                 isAnonymous: false
             });
+            // HELP FOR NOVICE USER: Print ID to console
+            console.log("%c YOUR USER ID IS: " + currentUser.id, "background: #222; color: #bada55; font-size: 25px; padding: 10px; border-radius: 5px;");
+
             fetchProfile(currentUser.id);
         } else {
             // Fallback: Check for Guest ID
