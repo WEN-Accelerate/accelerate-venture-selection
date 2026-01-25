@@ -90,6 +90,30 @@
             font-family: 'Courier New', monospace;
         }
 
+        .logout-btn {
+            background: #ff5722;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            float: right;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .logout-btn:hover {
+            background: #e64a19;
+        }
+
+        .not-logged-in {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            text-align: center;
+        }
+
         #userInfo {
             background: #fff3cd;
             padding: 15px;
@@ -102,46 +126,61 @@
 
 <body>
     <div class="card">
+        <button class="logout-btn" onclick="handleLogout()" id="logoutBtn" style="display:none;">
+            🚪 Log Out
+        </button>
+
         <h1>🎯 Make Me a Consultant</h1>
         <p>This page will automatically add you as a consultant in the database.</p>
 
-        <div class="step">
-            <strong>Step 1:</strong> Log in to your account (you should already be logged in)
+        <div id="notLoggedIn" class="not-logged-in" style="display:none;">
+            <h3>⚠️ You're Not Logged In</h3>
+            <p>You need to log in first before you can become a consultant.</p>
+            <button onclick="netlifyIdentity.open()"
+                style="background: #4CAF50; color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; margin-top: 10px;">
+                🔑 Click Here to Log In
+            </button>
         </div>
 
-        <div class="step">
-            <strong>Step 2:</strong> Click the button below
-        </div>
+        <div id="mainContent" style="display:none;">
+            <div class="step">
+                <strong>Step 1:</strong> Log in to your account ✅ (You're logged in!)
+            </div>
 
-        <div class="step">
-            <strong>Step 3:</strong> You'll be a consultant! 🎉
-        </div>
+            <div class="step">
+                <strong>Step 2:</strong> Click the button below
+            </div>
 
-        <div id="userInfo" style="display:none;">
-            <strong>Your User Info:</strong><br>
-            Email: <span id="userEmail"></span><br>
-            Name: <span id="userName"></span><br>
-            UID: <code id="userUID"></code>
-        </div>
+            <div class="step">
+                <strong>Step 3:</strong> You'll be a consultant! 🎉
+            </div>
 
-        <div class="info">
-            <strong>⚠️ Important:</strong> You must be logged in for this to work. If you're not logged in, the login
-            popup will appear.
-        </div>
+            <div id="userInfo" style="display:none;">
+                <strong>Your User Info:</strong><br>
+                Email: <span id="userEmail"></span><br>
+                Name: <span id="userName"></span><br>
+                UID: <code id="userUID"></code>
+            </div>
 
-        <button id="makeConsultantBtn" onclick="addMeAsConsultant()">
-            ✨ Make Me a Consultant Now
-        </button>
+            <div class="info">
+                <strong>⚠️ Important:</strong> Make sure you're logged in with the account you want to make a
+                consultant.
+            </div>
 
-        <div id="successMsg" class="success"></div>
-        <div id="errorMsg" class="error"></div>
+            <button id="makeConsultantBtn" onclick="addMeAsConsultant()">
+                ✨ Make Me a Consultant Now
+            </button>
 
-        <div class="info" style="margin-top: 30px;">
-            <strong>What happens when you click?</strong><br>
-            1. Checks if you're logged in<br>
-            2. Gets your user ID automatically<br>
-            3. Adds you to the consultants table in the database<br>
-            4. Redirects you to the Consultant Dashboard
+            <div id="successMsg" class="success"></div>
+            <div id="errorMsg" class="error"></div>
+
+            <div class="info" style="margin-top: 30px;">
+                <strong>What happens when you click?</strong><br>
+                1. Checks if you're logged in<br>
+                2. Gets your user ID automatically<br>
+                3. Adds you to the consultants table in the database<br>
+                4. Redirects you to the Consultant Dashboard
+            </div>
         </div>
     </div>
 
@@ -156,12 +195,35 @@
         window.addEventListener('load', () => {
             const user = netlifyIdentity.currentUser();
             if (user) {
+                // User is logged in - show main content
+                document.getElementById('mainContent').style.display = 'block';
+                document.getElementById('logoutBtn').style.display = 'block';
+                document.getElementById('notLoggedIn').style.display = 'none';
+
                 document.getElementById('userEmail').textContent = user.email;
                 document.getElementById('userName').textContent = user.user_metadata?.full_name || 'Not set';
                 document.getElementById('userUID').textContent = user.id;
                 document.getElementById('userInfo').style.display = 'block';
+            } else {
+                // User is NOT logged in
+                document.getElementById('mainContent').style.display = 'none';
+                document.getElementById('logoutBtn').style.display = 'none';
+                document.getElementById('notLoggedIn').style.display = 'block';
             }
         });
+
+        // Listen for login events
+        netlifyIdentity.on('login', () => {
+            window.location.reload();
+        });
+
+        // Logout handler
+        window.handleLogout = function () {
+            if (confirm('Are you sure you want to log out?')) {
+                netlifyIdentity.logout();
+                window.location.reload();
+            }
+        };
 
         // Add consultant to database
         window.addMeAsConsultant = async function () {
