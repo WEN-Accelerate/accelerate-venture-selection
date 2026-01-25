@@ -325,6 +325,45 @@ const CompanyCard = ({ company, onClick }) => {
                 </div>
             )}
 
+            {/* Strategy Progress Bar */}
+            <div className="mt-4">
+                <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-semibold text-gray-500">Strategy Progress</span>
+                    <span className="text-xs font-bold text-gray-900">
+                        {(() => {
+                            // Simple progress calculation
+                            let score = 0;
+                            const total = 5;
+                            const d = company.details || {};
+                            if (d.industry) score++;
+                            if (d.ventureType) score++;
+                            if (d.strategyDescription) score++;
+                            if (d.strategyDimensions && Object.keys(d.strategyDimensions).length > 0) score++;
+                            if (d.supportDetails && Object.keys(d.supportDetails).length > 0) score++;
+                            return Math.round((score / total) * 100);
+                        })()}%
+                    </span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5">
+                    <div
+                        className="bg-green-500 h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                            width: `${(() => {
+                                let score = 0;
+                                const total = 5;
+                                const d = company.details || {};
+                                if (d.industry) score++;
+                                if (d.ventureType) score++;
+                                if (d.strategyDescription) score++;
+                                if (d.strategyDimensions && Object.keys(d.strategyDimensions).length > 0) score++;
+                                if (d.supportDetails && Object.keys(d.supportDetails).length > 0) score++;
+                                return Math.round((score / total) * 100);
+                            })()}%`
+                        }}
+                    ></div>
+                </div>
+            </div>
+
             <div className="mt-4 flex items-center text-red-600 text-sm font-semibold group-hover:underline">
                 View Dashboard
                 <ChevronRight size={16} className="ml-1" />
