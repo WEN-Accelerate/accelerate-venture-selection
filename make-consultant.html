@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make Me a Consultant - Quick Setup</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .step {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+        }
+
+        button {
+            background: #D32F2F;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #b71c1c;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .success {
+            background: #4CAF50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #2196F3;
+        }
+
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        #userInfo {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>🎯 Make Me a Consultant</h1>
+        <p>This page will automatically add you as a consultant in the database.</p>
+
+        <div class="step">
+            <strong>Step 1:</strong> Log in to your account (you should already be logged in)
+        </div>
+
+        <div class="step">
+            <strong>Step 2:</strong> Click the button below
+        </div>
+
+        <div class="step">
+            <strong>Step 3:</strong> You'll be a consultant! 🎉
+        </div>
+
+        <div id="userInfo" style="display:none;">
+            <strong>Your User Info:</strong><br>
+            Email: <span id="userEmail"></span><br>
+            Name: <span id="userName"></span><br>
+            UID: <code id="userUID"></code>
+        </div>
+
+        <div class="info">
+            <strong>⚠️ Important:</strong> You must be logged in for this to work. If you're not logged in, the login
+            popup will appear.
+        </div>
+
+        <button id="makeConsultantBtn" onclick="addMeAsConsultant()">
+            ✨ Make Me a Consultant Now
+        </button>
+
+        <div id="successMsg" class="success"></div>
+        <div id="errorMsg" class="error"></div>
+
+        <div class="info" style="margin-top: 30px;">
+            <strong>What happens when you click?</strong><br>
+            1. Checks if you're logged in<br>
+            2. Gets your user ID automatically<br>
+            3. Adds you to the consultants table in the database<br>
+            4. Redirects you to the Consultant Dashboard
+        </div>
+    </div>
+
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script type="module">
+        import { supabase } from '/src/supabaseClient.js';
+
+        // Initialize Netlify Identity
+        netlifyIdentity.init();
+
+        // Check if user is logged in
+        window.addEventListener('load', () => {
+            const user = netlifyIdentity.currentUser();
+            if (user) {
+                document.getElementById('userEmail').textContent = user.email;
+                document.getElementById('userName').textContent = user.user_metadata?.full_name || 'Not set';
+                document.getElementById('userUID').textContent = user.id;
+                document.getElementById('userInfo').style.display = 'block';
+            }
+        });
+
+        // Add consultant to database
+        window.addMeAsConsultant = async function () {
+            const btn = document.getElementById('makeConsultantBtn');
+            const successMsg = document.getElementById('successMsg');
+            const errorMsg = document.getElementById('errorMsg');
+
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Processing...';
+
+            try {
+                // Get current user
+                const user = netlifyIdentity.currentUser();
+
+                if (!user) {
+                    // User not logged in, open login modal
+                    netlifyIdentity.open();
+                    btn.disabled = false;
+                    btn.textContent = '✨ Make Me a Consultant Now';
+
+                    // Wait for login
+                    netlifyIdentity.on('login', () => {
+                        window.location.reload();
+                    });
+                    return;
+                }
+
+                console.log('User:', user);
+
+                // Add to consultants table
+                const { data, error } = await supabase
+                    .from('consultants')
+                    .insert([{
+                        user_id: user.id,
+                        email: user.email,
+                        name: user.user_metadata?.full_name || user.email.split('@')[0]
+                    }])
+                    .select();
+
+                if (error) {
+                    // Check if already exists
+                    if (error.code === '23505') {
+                        successMsg.innerHTML = `
+                            ✅ You're already a consultant!<br>
+                            Redirecting to your dashboard...
+                        `;
+                        successMsg.style.display = 'block';
+
+                        setTimeout(() => {
+                            window.location.href = '/dashboard.html';
+                        }, 2000);
+                        return;
+                    }
+                    throw error;
+                }
+
+                console.log('Success:', data);
+
+                successMsg.innerHTML = `
+                    🎉 <strong>Success!</strong><br><br>
+                    You are now a consultant!<br>
+                    Email: ${user.email}<br>
+                    UID: ${user.id}<br><br>
+                    Redirecting to your Consultant Dashboard...
+                `;
+                successMsg.style.display = 'block';
+
+                // Redirect to dashboard after 3 seconds
+                setTimeout(() => {
+                    window.location.href = '/dashboard.html';
+                }, 3000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                errorMsg.innerHTML = `
+                    ❌ <strong>Error:</strong><br>
+                    ${error.message}<br><br>
+                    Please make sure:<br>
+                    1. You ran the database migration in Supabase<br>
+                    2. You're connected to the internet<br>
+                    3. Try refreshing the page
+                `;
+                errorMsg.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '✨ Try Again';
+            }
+        };
+    </script>
+</body>
+
+</html>
