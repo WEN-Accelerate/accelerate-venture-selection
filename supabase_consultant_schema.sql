@@ -140,6 +140,8 @@ CREATE POLICY "Consultants can view assigned companies" ON profiles
     );
 
 -- Step 10: Create view for consultant dashboard
+DROP VIEW IF EXISTS consultant_companies_view;
+
 CREATE OR REPLACE VIEW consultant_companies_view AS
 SELECT 
     ca.consultant_id,
