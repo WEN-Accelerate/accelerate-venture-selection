@@ -10,6 +10,7 @@ export default defineConfig({
             input: {
                 main: resolve(__dirname, 'index.html'),
                 profile: resolve(__dirname, 'profile.html'),
+                dashboard: resolve(__dirname, 'dashboard.html'),
             },
         },
     },
