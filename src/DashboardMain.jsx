@@ -643,20 +643,33 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
             const ai = new GoogleGenAI({ apiKey });
 
             const prompt = `
-                Act as a Strategy Consultant for a ${profile.industry} company.
-                Context: Venture Type: ${profile.ventureType}, Product: ${profile.products}.
+                Act as a Strategy Consultant for ${profile.companyName || 'a company'} (Industry: ${profile.industry || 'Unknown'}).
                 
-                Task: Create a detailed action plan for the capability "${card.item}" (Category: ${card.category}).
+                COMPREHENSIVE CONTEXT:
+                - Products: ${profile.products || 'Not specified'}
+                - Target Customers: ${profile.customers || 'Not specified'}
+                - Current Revenue: ${profile.revenue || 'Not specified'} (${profile.profitability || 'Unknown Status'})
+                - Team Size: ${profile.employees || 'Not specified'}
+                - Core Strategy Statement: "${profile.strategyDescription || 'N/A'}"
+                - Expansion Goal: ${profile.ventureType} Expansion targeting ${profile.growthTarget ? '$' + profile.growthTarget : 'growth'}.
+
+                FOCUS AREA:
+                - Capability to Build: "${card.item}"
+                - Category: ${card.category} Support
+                - Execution Mode: ${card.type} (Where 'WF' = Wadhwani Foundation supported, 'Self' = In-house)
+
+                TASK:
+                Create a highly specific, tactical Action Plan for executing this capability.
                 
                 Return a JSON object with:
-                1. "description": A 2-sentence description of what this capability entails.
-                2. "context": Why is this critical for ${profile.ventureType} expansion?
-                3. "objectives": The primary outcome/objective to achieve.
-                4. "actions": An array of 5 specific sub-tasks. Each must have:
-                   - "text": The action text.
-                   - "masterclass": boolean (Is a workshop needed?)
+                1. "description": A 2-sentence description of what this capability entails strategically.
+                2. "context": Why is this specifically critical for ${profile.ventureType} expansion given the context above?
+                3. "objectives": The primary specific outcome/objective to achieve implies success.
+                4. "actions": An array of 5 specific, actionable sub-tasks. Each must have:
+                   - "text": The action text (be specific).
+                   - "masterclass": boolean (Is a workshop/training needed?)
                    - "expert": boolean (Is expert consultation needed?)
-                   - "knowledge_pack": boolean (Is a template/guide needed?)
+                   - "knowledge_pack": boolean (Is a template/guide/tool needed?)
                 
                 Return JSON only.
             `;
