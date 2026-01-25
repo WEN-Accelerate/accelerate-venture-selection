@@ -23,6 +23,9 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.c
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// WADHWANI BRAND ASSETS
+const WADHWANI_LOGO_URL = "https://cdn.wadhwanifoundation.org/wp-content/uploads/2023/06/WF-Logo.svg";
+
 const BRAND_COLORS = {
     red: 'bg-[#D32F2F]',
     orange: 'bg-[#F57C00]',
@@ -334,23 +337,36 @@ export default function ProfileWizard() {
         <div className="min-h-screen bg-[#F8F9FA] text-gray-900 font-sans selection:bg-red-100 selection:text-red-900">
 
             {/* HEADER */}
-            <header className="fixed top-0 w-full bg-white/70 backdrop-blur-md border-b border-gray-100 z-50 px-6 py-4 flex justify-between items-center">
-                <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-                    <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center text-white">
-                        <Sparkles size={18} />
-                    </div>
-                    Wadhwani <span className="text-gray-400 font-normal">Accelerate Profile</span>
+            <header className="fixed top-0 w-full bg-white/90 backdrop-blur-md border-b border-gray-100 z-50 px-6 py-4 flex justify-between items-center shadow-sm">
+                <div className="flex items-center gap-3">
+                    <img src={WADHWANI_LOGO_URL} alt="Wadhwani Foundation" className="h-10" />
+                    <div className="h-6 w-px bg-gray-300 mx-1"></div>
+                    <span className="font-semibold text-gray-700 tracking-tight">Accelerate Profile</span>
                 </div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-widest">
-                    Step {step} of 9
+                <div className="flex flex-col items-end gap-1">
+                    <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                        Step {step} of 9
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-[#D32F2F] to-[#F57C00] transition-all duration-300 ease-out"
+                            style={{ width: `${(step / 9) * 100}%` }}
+                        ></div>
+                    </div>
                 </div>
             </header>
 
-            <div className="pt-24 pb-20">
+            <div className="pt-28 pb-20">
 
                 {/* STEP 1: COMPANY NAME */}
                 {step === 1 && (
-                    <StepContainer title="Let's start with your company" showBack={false} aiContext={aiContext}>
+                    <StepContainer
+                        title="Let's start about your company"
+                        showBack={false}
+                        aiContext={aiContext}
+                    >
+                        <p className="-mt-6 mb-6 text-gray-500">We'll use AI to pre-fill your business details.</p>
                         <div className="space-y-4">
                             <label className="block text-sm font-semibold text-gray-700">Company Name</label>
                             <input
@@ -378,57 +394,69 @@ export default function ProfileWizard() {
 
                 {/* STEP 2: AUTO-POPULATED INFO */}
                 {step === 2 && (
-                    <StepContainer title="Confirm Business Profile" onBack={handleBack} aiContext={aiContext}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Industry</label>
-                                <input
-                                    value={profile.industry}
-                                    onChange={e => setProfile({ ...profile, industry: e.target.value })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                />
+                    <StepContainer
+                        title="Confirm Business Profile"
+                        onBack={handleBack}
+                        aiContext={aiContext}
+                    >
+                        <p className="-mt-6 mb-6 text-gray-500 border-b pb-4">Review and edit your company's details retrieved by the AI.</p>
+
+                        <div className="space-y-6">
+                            {/* Short Fields Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Industry</label>
+                                    <input
+                                        value={profile.industry}
+                                        onChange={e => setProfile({ ...profile, industry: e.target.value })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Employees</label>
+                                    <input
+                                        value={profile.employees}
+                                        onChange={e => setProfile({ ...profile, employees: e.target.value })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    />
+                                </div>
                             </div>
+
+                            {/* Long Fields (Single Column) */}
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Products</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Products / Services</label>
                                 <textarea
-                                    rows={2}
+                                    rows={3}
                                     value={profile.products}
                                     onChange={e => setProfile({ ...profile, products: e.target.value })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none resize-none"
                                 />
                             </div>
 
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Target Customers</label>
-                                <input
+                                <textarea
+                                    rows={2}
                                     value={profile.customers}
                                     onChange={e => setProfile({ ...profile, customers: e.target.value })}
-                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none resize-none"
                                 />
                             </div>
+
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Employees</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Personnel / Directors</label>
                                 <input
-                                    value={profile.employees}
-                                    onChange={e => setProfile({ ...profile, employees: e.target.value })}
+                                    value={profile.keyPersonnel}
+                                    onChange={e => setProfile({ ...profile, keyPersonnel: e.target.value })}
                                     className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                    placeholder="e.g. John Doe (CEO), Jane Smith (CTO)"
                                 />
                             </div>
+
+                            <button key="next2" onClick={handleNext} className="w-full btn-primary py-3 px-6 bg-[#D32F2F] text-white rounded-lg font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100">
+                                Confirm & Continue
+                            </button>
                         </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Key Personnel / Directors</label>
-                            <input
-                                value={profile.keyPersonnel}
-                                onChange={e => setProfile({ ...profile, keyPersonnel: e.target.value })}
-                                className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                placeholder="e.g. John Doe (CEO), Jane Smith (CTO)"
-                            />
-                        </div>
-                        <button key="next2" onClick={handleNext} className="btn-primary mt-4 py-3 px-6 bg-gray-900 text-white rounded-lg font-bold hover:bg-black transition-colors">
-                            Confirm & Continue
-                        </button>
                     </StepContainer>
                 )}
 
@@ -436,38 +464,45 @@ export default function ProfileWizard() {
                 {step === 3 && (
                     <StepContainer title="Financial Health" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Annual Revenue (Last FY)</label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                                    <select
-                                        value={profile.revenue}
-                                        onChange={e => setProfile({ ...profile, revenue: e.target.value })}
-                                        className="w-full p-3 pl-10 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none appearance-none"
-                                    >
-                                        <option value="">Select Revenue Range</option>
-                                        <option value="<1M">&lt; $1M / ₹8Cr</option>
-                                        <option value="1M-5M">$1M - $5M</option>
-                                        <option value="5M-20M">$5M - $20M</option>
-                                        <option value=">20M">&gt; $20M</option>
-                                    </select>
+                            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                                <h4 className="text-sm font-bold text-gray-800 border-b border-gray-200 pb-2 mb-4">Last Fiscal Year Performance</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+                                            Annual Revenue <Info size={14} className="text-gray-400" />
+                                        </label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                                            <select
+                                                value={profile.revenue}
+                                                onChange={e => setProfile({ ...profile, revenue: e.target.value })}
+                                                className="w-full p-3 pl-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none appearance-none cursor-pointer"
+                                            >
+                                                <option value="">Select Revenue Range</option>
+                                                <option value="<1M">&lt; $1M / ₹8Cr</option>
+                                                <option value="1M-5M">$1M - $5M</option>
+                                                <option value="5M-20M">$5M - $20M</option>
+                                                <option value=">20M">&gt; $20M</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Profitability Indicator</label>
+                                        <select
+                                            value={profile.profitability}
+                                            onChange={e => setProfile({ ...profile, profitability: e.target.value })}
+                                            className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none cursor-pointer"
+                                        >
+                                            <option value="">Select Status</option>
+                                            <option value="Profitable">Profitable (&gt;10% EBITDA)</option>
+                                            <option value="BreakEven">Break-even</option>
+                                            <option value="LossMaking">Loss Making (Burn Phase)</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Profitability Indicator</label>
-                                <select
-                                    value={profile.profitability}
-                                    onChange={e => setProfile({ ...profile, profitability: e.target.value })}
-                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
-                                >
-                                    <option value="">Select Status</option>
-                                    <option value="Profitable">Profitable (&gt;10% EBITDA)</option>
-                                    <option value="BreakEven">Break-even</option>
-                                    <option value="LossMaking">Loss Making (Burn Phase)</option>
-                                </select>
-                            </div>
-                            <button onClick={handleNext} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                                Next Step
+                            <button onClick={handleNext} className="w-full py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100">
+                                Continue
                             </button>
                         </div>
                     </StepContainer>
@@ -477,27 +512,46 @@ export default function ProfileWizard() {
                 {step === 4 && (
                     <StepContainer title="Growth Ambition" onBack={handleBack} aiContext={aiContext}>
                         <div className="text-center mb-8">
-                            <div className="inline-block p-4 bg-green-100 text-green-700 rounded-full mb-4">
+                            <div className="inline-block p-4 bg-red-50 text-[#D32F2F] rounded-full mb-4">
                                 <Target size={32} />
                             </div>
-                            <p className="text-gray-600">Where do you want to be in 3 years?</p>
+                            <p className="text-gray-600 font-medium">Enter your revenue goal (in USD) for 3 years from now.</p>
                         </div>
 
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">Target Revenue Goal</label>
                             <div className="relative">
-                                <DollarSign className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                                <DollarSign className="absolute left-4 top-4 text-gray-400" size={20} />
                                 <input
                                     type="text"
                                     value={profile.growthTarget}
-                                    onChange={e => setProfile({ ...profile, growthTarget: e.target.value })}
-                                    className="w-full text-lg p-4 pl-10 bg-white border-2 border-green-100 rounded-xl focus:border-green-500 outline-none shadow-sm placeholder:text-gray-300"
-                                    placeholder="e.g. $15M"
+                                    onChange={e => {
+                                        // Numeric validation
+                                        const val = e.target.value.replace(/[^0-9.]/g, '');
+                                        setProfile({ ...profile, growthTarget: val });
+                                    }}
+                                    onBlur={() => {
+                                        // Format on blur
+                                        if (profile.growthTarget && !profile.growthTarget.includes('M')) {
+                                            // Simple formatter placeholder
+                                        }
+                                    }}
+                                    className="w-full text-2xl p-4 pl-12 bg-white border-2 border-gray-200 rounded-xl focus:border-[#D32F2F] outline-none shadow-sm placeholder:text-gray-300 font-bold"
+                                    placeholder="15,000,000"
                                 />
+                                {profile.growthTarget && !isNaN(profile.growthTarget) && (
+                                    <p className="text-xs text-green-600 mt-2 font-medium">
+                                        Reads as: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(profile.growthTarget)}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
-                        <button onClick={handleNext} className="w-full mt-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-colors shadow-lg shadow-green-200">
+                        <button
+                            onClick={handleNext}
+                            disabled={!profile.growthTarget}
+                            className="w-full mt-8 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100 disabled:opacity-50"
+                        >
                             Set Goal
                         </button>
                     </StepContainer>
