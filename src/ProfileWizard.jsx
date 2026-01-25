@@ -150,88 +150,110 @@ export default function ProfileWizard() {
     const handleBack = () => setStep(prev => prev - 1);
 
     // --- STEP 1: SCRAPE ---
+    // --- STEP 1: SCRAPE ---
     const handleScrape = async () => {
         if (!profile.companyName) return;
         setLoading(true);
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+        const ai = new GoogleGenAI({ apiKey });
+
+        // Helper to parse loose JSON
+        const parseLooseJson = (text) => {
+            try {
+                const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(clean);
+            } catch (e) {
+                console.error("JSON Parse Failed", e);
+                return {};
+            }
+        };
 
         try {
-            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-            // Use the new Google Gen AI SDK for deep research with Grounding
-            const ai = new GoogleGenAI({ apiKey });
-
-            const prompt = `Perform comprehensive research on the company: "${profile.companyName}". 
-            Provide details for the following fields:
-            - Exact Legal Name
-            - Industry Category
-            - Detailed Description of Business
-            - Promoter/Founder/Director Details
-            - GST Number (if publicly available)
-            - Key Products/Services Offered
-            - Primary Customer Segments (B2B, B2C, target audience)
-            - Estimated Employee Count (Approximate range)
-            - Current Market Standing
-            
-            Be as factual as possible using search results.`;
+            console.log("Attempting Deep Search with gemini-2.0-flash-exp...");
+            // ATTEMPT 1: Deep Search with gemini-2.0-flash-exp
+            const prompt = `Research the company "${profile.companyName}".
+            Return a JSON object with these exact keys:
+            {
+                "name": "Legal Name",
+                "industry": "Industry Category",
+                "description": "2 sentence description",
+                "promoters": ["Name 1", "Name 2"],
+                "products": ["Product 1", "Product 2"],
+                "customers": ["Segment 1"],
+                "marketPosition": "Current standing",
+                "employees": "Estimated count (e.g. 100-500)"
+            }
+            If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
             const response = await ai.models.generateContent({
                 model: "gemini-2.0-flash-exp",
                 contents: prompt,
                 config: {
                     tools: [{ googleSearch: {} }],
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: Type.OBJECT,
-                        properties: {
-                            name: { type: Type.STRING },
-                            industry: { type: Type.STRING },
-                            description: { type: Type.STRING },
-                            promoters: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            products: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            customers: { type: Type.ARRAY, items: { type: Type.STRING } },
-                            marketPosition: { type: Type.STRING },
-                            employees: { type: Type.STRING }
-                        },
-                        required: ["name", "industry", "description", "promoters", "products", "customers", "employees"]
-                    }
+                    // Relaxed schema: we parse manually to avoid validation errors on partial data
                 }
             });
 
-            // Handle potential null/undefined text - try property first, then method if exists
+            // Handle response
             let rawText = response.text;
-            if (typeof rawText === 'function') {
-                rawText = rawText(); // handle if it's a method in this SDK version
-            }
-            if (!rawText) rawText = "{}";
+            if (typeof rawText === 'function') rawText = rawText();
+            if (!rawText) throw new Error("Empty response from Search model");
 
-            console.log("AI Raw Response:", rawText); // DEBUG
-            const data = JSON.parse(rawText);
-            console.log("Parsed Data:", data); // DEBUG
+            console.log("Search Response:", rawText);
+            const data = parseLooseJson(rawText);
 
             if (!data.name && !data.industry) {
-                console.warn("AI returned empty structured data.");
-                throw new Error("Empty AI Data");
+                throw new Error("Search returned not useful data");
             }
 
+            // Success Update
             setProfile(prev => ({
                 ...prev,
                 companyName: data.name || prev.companyName,
                 industry: data.industry || "",
-                products: data.products?.join(", ") || "",
-                customers: data.customers?.join(", ") || "",
+                products: Array.isArray(data.products) ? data.products.join(", ") : (data.products || ""),
+                customers: Array.isArray(data.customers) ? data.customers.join(", ") : (data.customers || ""),
                 employees: data.employees || "",
-                keyPersonnel: data.promoters?.join(", ") || "",
-                // Heuristic: If we found promoters, use the first one as potential lead suggestion
-                growthLead: (data.promoters && data.promoters.length > 0) ? data.promoters[0] : prev.growthLead
+                keyPersonnel: Array.isArray(data.promoters) ? data.promoters.join(", ") : (data.promoters || ""),
+                growthLead: (Array.isArray(data.promoters) && data.promoters.length > 0) ? data.promoters[0] : prev.growthLead
             }));
-
-            setAiContext(`Analyzed ${data.name || profile.companyName}. Industry: ${data.industry}. Position: ${data.marketPosition || 'N/A'}`);
+            setAiContext(`Analyzed ${data.name}. Source: Deep Search.`);
             setStep(2);
 
-        } catch (e) {
-            console.error("Deep Research Error", e);
-            // Fallback to simple simulation or just proceed
-            setAiContext(`Could not auto-analyze. Please fill manually.`);
-            setStep(2);
+        } catch (error) {
+            console.warn("Deep Search Failed, falling back to Internal Knowledge...", error);
+
+            try {
+                // ATTEMPT 2: Fallback to gemini-1.5-flash (Internal Knowledge)
+                const fallbackPrompt = `Act as a business analyst. Analyze company "${profile.companyName}".
+                Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
+
+                const response = await ai.models.generateContent({
+                    model: "gemini-1.5-flash",
+                    contents: fallbackPrompt
+                });
+
+                let rawText = response.text;
+                if (typeof rawText === 'function') rawText = rawText();
+                const data = parseLooseJson(rawText || "{}");
+
+                setProfile(prev => ({
+                    ...prev,
+                    companyName: data.name || prev.companyName,
+                    industry: data.industry || "",
+                    products: Array.isArray(data.products) ? data.products.join(", ") : (data.products || ""),
+                    customers: Array.isArray(data.customers) ? data.customers.join(", ") : (data.customers || ""),
+                    employees: data.employees || "",
+                    keyPersonnel: Array.isArray(data.promoters) ? data.promoters.join(", ") : (data.promoters || ""),
+                }));
+                setAiContext(`Analyzed ${profile.companyName} using Internal Knowledge.`);
+                setStep(2);
+
+            } catch (finalError) {
+                console.error("All AI attempts failed", finalError);
+                setAiContext("Could not auto-analyze. Please fill manually.");
+                setStep(2);
+            }
         }
         setLoading(false);
     };
