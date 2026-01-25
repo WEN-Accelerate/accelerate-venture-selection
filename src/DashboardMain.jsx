@@ -3,8 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
-    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut
+    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
+    Trash2, Plus, Wand2, GraduationCap, Box, Play
 } from 'lucide-react';
+import { GoogleGenAI } from "@google/genai";
 
 // --- CONFIG ---
 
@@ -222,7 +224,11 @@ export default function DashboardMain() {
                 item,
                 type, // WF, Self, NA
                 dueDate: meta.dueDate || '',
-                owner: meta.owner || ''
+                owner: meta.owner || '',
+                description: meta.description || '',
+                context: meta.context || '',
+                objectives: meta.objectives || '',
+                subActions: meta.subActions || []
             };
         }).filter(card => {
             if (filter === 'ALL') return card.type !== 'NA'; // Usually hide NA in "Everything"
@@ -519,14 +525,24 @@ export default function DashboardMain() {
 
             </main>
 
-            {/* MODAL */}
+            {/* RIGHT SIDE PANEL (SLIDE OVERS) */}
             {selectedCard && (
-                <DetailModal
+                <ActionPlanPanel
                     card={selectedCard}
+                    profile={profile} // Pass full profile for AI context
                     onClose={() => setSelectedCard(null)}
                     onSave={(updates) => {
                         handleUpdateCard(selectedCard.id, updates);
-                        setSelectedCard(null); // Close on save or keep open? UI implies 'Save Milestones' closes it.
+                        // Don't close immediately on save to allow further editing, or close if preferred.
+                        // For a panel, usually explicit close is better, but let's keep it open to show success?
+                        // Actually, 'Save' usually implies 'Finish' in this context. Let's keep it open if it's "Save", close if "Done".
+                        // Logic ref: we'll just update the card live and maybe show a toast.
+                        // For now, let's keep the parent state updated but not close relevant to typical slide-over behavior.
+                        // However, to refresh the `cards` list, `selectedCard` needs to update? No, handleUpdateCard updates profile.
+                        // To keep UI in sync, we might need to re-fetch or re-calc. `cards` is memoized on profile.
+                        // We will update the `selectedCard` prop by closing/reopening? 
+                        // Better: The panel manages its own local state which initializes from props.
+                        // When we save, we push to DB. Next time it opens, it pulls new data.
                     }}
                 />
             )}
@@ -603,93 +619,317 @@ const KaizenCard = ({ card, onClick }) => {
     );
 };
 
-const DetailModal = ({ card, onClose, onSave }) => {
-    const isWF = card.type === 'WF';
+const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
+    // Local state for form fields
     const [dueDate, setDueDate] = useState(card.dueDate || '');
     const [owner, setOwner] = useState(card.owner || '');
+    const [description, setDescription] = useState(card.description || '');
+    const [context, setContext] = useState(card.context || '');
+    const [objectives, setObjectives] = useState(card.objectives || '');
+    const [subActions, setSubActions] = useState(card.subActions || []);
+
+    const [aiLoading, setAiLoading] = useState(false);
+
+    // AI Helper
+    const generatePlanWithAI = async () => {
+        setAiLoading(true);
+        try {
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+            if (!apiKey) {
+                alert("AI Simulation: Key missing.");
+                setAiLoading(false);
+                return;
+            }
+            const ai = new GoogleGenAI({ apiKey });
+            const model = ai.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+
+            const prompt = `
+                Act as a Strategy Consultant for a ${profile.industry} company.
+                Context: Venture Type: ${profile.ventureType}, Product: ${profile.products}.
+                
+                Task: Create a detailed action plan for the capability "${card.item}" (Category: ${card.category}).
+                
+                Return a JSON object with:
+                1. "description": A 2-sentence description of what this capability entails.
+                2. "context": Why is this critical for ${profile.ventureType} expansion?
+                3. "objectives": The primary outcome/objective to achieve.
+                4. "actions": An array of 5 specific sub-tasks. Each must have:
+                   - "text": The action text.
+                   - "masterclass": boolean (Is a workshop needed?)
+                   - "expert": boolean (Is expert consultation needed?)
+                   - "knowledge_pack": boolean (Is a template/guide needed?)
+                
+                Return JSON only.
+            `;
+
+            const result = await model.generateContent(prompt);
+            const response = result.response;
+            const text = response.text();
+
+            // Loose JSON parsing
+            const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const data = JSON.parse(cleanJson);
+
+            setDescription(data.description || description);
+            setContext(data.context || context);
+            setObjectives(data.objectives || objectives);
+
+            if (data.actions && Array.isArray(data.actions)) {
+                // Map to our internal structure
+                const newActions = data.actions.map((act, idx) => ({
+                    id: Date.now() + idx,
+                    text: act.text,
+                    masterclass: act.masterclass || false,
+                    expert: act.expert || false,
+                    knowledgePack: act.knowledge_pack || false
+                }));
+                // Append or replace? Let's replace if empty, or append if exists? 
+                // Let's replace to be clean, user can regenerate.
+                setSubActions(newActions);
+            }
+
+        } catch (e) {
+            console.error("AI Error:", e);
+            alert("Could not generate plan. Please try again.");
+        }
+        setAiLoading(false);
+    };
+
+    const handleSave = () => {
+        onSave({
+            dueDate,
+            owner,
+            description,
+            context,
+            objectives,
+            subActions
+        });
+        // Optional toast here
+    };
+
+    // Sub Action Handlers
+    const addSubAction = () => {
+        setSubActions([...subActions, {
+            id: Date.now(),
+            text: "",
+            masterclass: false,
+            expert: false,
+            knowledgePack: false
+        }]);
+    };
+
+    const removeSubAction = (id) => {
+        setSubActions(subActions.filter(a => a.id !== id));
+    };
+
+    const updateSubAction = (id, field, value) => {
+        setSubActions(subActions.map(a =>
+            a.id === id ? { ...a, [field]: value } : a
+        ));
+    };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1a1f2e]/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex justify-end">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
 
-                {/* Close Button */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-6 right-6 p-2 bg-gray-100/50 hover:bg-gray-100 rounded-full transition-colors z-10"
-                >
-                    <X size={20} className="text-gray-500" />
-                </button>
+            {/* Panel */}
+            <div className="relative w-full max-w-2xl h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
 
-                {/* Content */}
-                <div className="p-12">
-
-                    {/* Header */}
-                    <div className="mb-10 relative">
-                        {/* Decorative Background Icon */}
-                        <div className="absolute -top-6 -right-6 text-gray-50 opacity-50 transform rotate-12 pointer-events-none">
-                            <Target size={200} />
+                {/* Header */}
+                <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-start bg-gray-50/50">
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-red-100 text-[#D32F2F] text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+                                {card.category} Support
+                            </span>
+                            <span className="text-gray-400 text-xs">•</span>
+                            <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide">
+                                {card.type} Mode
+                            </span>
                         </div>
-
-                        <span className="inline-block py-1 px-3 rounded-full bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-widest mb-4">
-                            Management Model: {card.type}
-                        </span>
-                        <h2 className="text-4xl font-black text-gray-900 mb-2 relative z-10">{card.item}</h2>
-                        <p className="text-gray-400 font-bold uppercase tracking-widest text-sm relative z-10">{card.category} Pillar</p>
-                    </div>
-
-                    {/* Inputs Row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                        <div className="bg-gray-50 rounded-2xl p-6 hover:bg-gray-100 transition-colors group">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 group-hover:text-gray-500">Milestone Due Date</label>
-                            <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-black text-gray-900 leading-tight">{card.item}</h2>
+                        <div className="flex items-center gap-4 mt-4">
+                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm hover:border-red-200 transition-colors group">
+                                <Calendar size={14} className="text-gray-400 group-hover:text-red-500" />
                                 <input
                                     type="date"
                                     value={dueDate}
                                     onChange={(e) => setDueDate(e.target.value)}
-                                    className="bg-transparent text-xl font-bold text-gray-900 w-full outline-none"
+                                    className="text-xs font-bold text-gray-700 outline-none bg-transparent uppercase cursor-pointer"
                                 />
-                                <Calendar className="text-gray-400 group-hover:text-gray-600" size={20} />
+                            </div>
+                            <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm hover:border-red-200 transition-colors group flex-1">
+                                <User size={14} className="text-gray-400 group-hover:text-red-500" />
+                                <input
+                                    type="text"
+                                    value={owner}
+                                    onChange={(e) => setOwner(e.target.value)}
+                                    placeholder="Assign Owner..."
+                                    className="text-xs font-bold text-gray-700 outline-none bg-transparent w-full"
+                                />
                             </div>
                         </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-900 transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
 
-                        <div className="bg-gray-50 rounded-2xl p-6 hover:bg-gray-100 transition-colors group">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 group-hover:text-gray-500">Accountable Owner</label>
-                            <input
-                                type="text"
-                                value={owner}
-                                onChange={(e) => setOwner(e.target.value)}
-                                placeholder="Assign Strategy Lead..."
-                                className="bg-transparent text-xl font-bold text-gray-900 w-full outline-none placeholder:text-gray-300"
-                            />
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto px-8 py-8 space-y-8 custom-scrollbar">
+
+                    {/* Section 1: Context & Objectives (AI Powered) */}
+                    <div className="relative group">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                                <Target size={16} className="text-red-600" />
+                                Strategic Context
+                            </h3>
+                            <button
+                                onClick={generatePlanWithAI}
+                                disabled={aiLoading}
+                                className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-2 transition-all disabled:opacity-50"
+                            >
+                                {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                {aiLoading ? 'Analyzing...' : 'Auto-Generate with AI'}
+                            </button>
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4 focus-within:ring-2 focus-within:ring-red-500/10 transition-shadow">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Description</label>
+                                <textarea
+                                    rows={2}
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="w-full text-sm text-gray-800 font-medium bg-transparent outline-none resize-none placeholder:text-gray-300"
+                                    placeholder="What is this initiative about?"
+                                />
+                            </div>
+                            <div className="h-px bg-gray-100"></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Strategic Importance</label>
+                                    <textarea
+                                        rows={3}
+                                        value={context}
+                                        onChange={(e) => setContext(e.target.value)}
+                                        className="w-full text-sm text-gray-600 leading-relaxed bg-transparent outline-none resize-none placeholder:text-gray-300"
+                                        placeholder="Why is this critical now?"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Success Metrics</label>
+                                    <textarea
+                                        rows={3}
+                                        value={objectives}
+                                        onChange={(e) => setObjectives(e.target.value)}
+                                        className="w-full text-sm text-gray-600 leading-relaxed bg-transparent outline-none resize-none placeholder:text-gray-300"
+                                        placeholder="What does success look like?"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Action Cards */}
-                    <div className="grid grid-cols-3 gap-4 mb-10">
-                        <button className="bg-[#0f172a] text-white rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-transform shadow-lg">
-                            <BookOpen size={24} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Masterclasses</span>
-                        </button>
-                        <button className="bg-[#D32F2F] text-white rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-transform shadow-lg shadow-red-200">
-                            <MessageCircle size={24} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Expert Network</span>
-                        </button>
-                        <button className="bg-white border border-gray-100 text-gray-600 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 transition-colors shadow-sm">
-                            <ExternalLink size={24} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Resource Bank</span>
-                        </button>
-                    </div>
+                    {/* Section 2: Action Plan */}
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                                <Briefcase size={16} className="text-red-600" />
+                                Execution Plan
+                            </h3>
+                            <button
+                                onClick={addSubAction}
+                                className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all"
+                            >
+                                <Plus size={12} /> Add Item
+                            </button>
+                        </div>
 
-                    {/* Save Button */}
-                    <div className="flex justify-end">
-                        <button
-                            onClick={() => onSave({ dueDate, owner })}
-                            className="bg-[#D32F2F] text-white px-10 py-4 rounded-xl font-bold text-sm uppercase tracking-wider shadow-xl shadow-red-200 hover:bg-[#B71C1C] transition-all hover:scale-105"
-                        >
-                            Save Milestones
-                        </button>
-                    </div>
+                        <div className="space-y-3">
+                            {subActions.length === 0 && (
+                                <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                    <p className="text-sm text-gray-400 font-medium">No actions defined yet.</p>
+                                    <button onClick={generatePlanWithAI} className="text-indigo-600 text-xs font-bold mt-2 hover:underline">Use AI to suggest actions</button>
+                                </div>
+                            )}
 
+                            {subActions.map((action, idx) => (
+                                <div key={action.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm group hover:shadow-md transition-all">
+                                    <div className="flex gap-3 items-start">
+                                        <div className="mt-1 text-xs font-bold text-gray-300">0{idx + 1}</div>
+                                        <div className="flex-1 space-y-3">
+                                            <input
+                                                value={action.text}
+                                                onChange={(e) => updateSubAction(action.id, 'text', e.target.value)}
+                                                className="w-full text-sm font-bold text-gray-900 outline-none placeholder:text-gray-300 border-b border-transparent focus:border-gray-200 transition-colors pb-1"
+                                                placeholder="Describe the action item..."
+                                            />
+
+                                            {/* Support Toggles */}
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => updateSubAction(action.id, 'masterclass', !action.masterclass)}
+                                                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.masterclass
+                                                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <GraduationCap size={12} />
+                                                    Masterclass
+                                                </button>
+                                                <button
+                                                    onClick={() => updateSubAction(action.id, 'expert', !action.expert)}
+                                                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.expert
+                                                            ? 'bg-purple-50 border-purple-200 text-purple-700'
+                                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <MessageCircle size={12} />
+                                                    Expert
+                                                </button>
+                                                <button
+                                                    onClick={() => updateSubAction(action.id, 'knowledgePack', !action.knowledgePack)}
+                                                    className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.knowledgePack
+                                                            ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                                        }`}
+                                                >
+                                                    <Box size={12} />
+                                                    Knowledge Pack
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => removeSubAction(action.id)}
+                                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 z-10">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className="px-8 py-3 rounded-xl font-bold text-white bg-[#D32F2F] hover:bg-[#B71C1C] shadow-lg shadow-red-200 transition-all transform hover:scale-[1.02] flex items-center gap-2 text-sm"
+                    >
+                        <Save size={18} />
+                        Save Action Plan
+                    </button>
                 </div>
             </div>
         </div>
