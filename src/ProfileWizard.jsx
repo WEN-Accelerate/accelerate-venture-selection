@@ -24,7 +24,8 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // WADHWANI BRAND ASSETS
-const WADHWANI_LOGO_URL = "https://cdn.wadhwanifoundation.org/wp-content/uploads/2023/06/WF-Logo.svg";
+// WADHWANI BRAND ASSETS
+const WADHWANI_LOGO_URL = "https://avatars.githubusercontent.com/u/16666031?s=280&v=4"; // Reliable fallback source
 
 const BRAND_COLORS = {
     red: 'bg-[#D32F2F]',
@@ -239,46 +240,47 @@ export default function ProfileWizard() {
         setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
     };
 
-    const handleLearnMore = async () => {
+    const handleLearnMore = async (selectedType) => {
         setShowLearnMore(true);
         setLearnMoreLoading(true);
-        setLearnMoreData(null); // Clear previous data
+        setLearnMoreData(null);
+
+        // Analyze SPECIFICALLY the selected type
+        const typeToAnalyze = selectedType || profile.ventureType;
 
         const prompt = `
-            Analyze specific expansion options for:
+            Analyze the strategy: "${typeToAnalyze} Expansion" for:
             Company: ${profile.companyName}
             Industry: ${profile.industry}
             Products: ${profile.products}
             Customers: ${profile.customers}
             Revenue: ${profile.revenue}
-            Employees: ${profile.employees}
 
-            Task: Compare "Domestic Expansion" vs "International Expansion" for THIS specific business.
-            Return a JSON array with exactly 2 objects (one for each option).
-            
-            Structure:
-            [
-              {
-                "type": "QUICK WIN" or "STRATEGIC MOVE",
-                "title": "EXPAND DOMESTICALLY" or "GO INTERNATIONAL",
-                "recommendation": "Specific advice...",
-                "impact": "Expected outcome..."
-              },
-               ...
-            ]
+            Task: Provide a strategic analysis for this SPECIFIC choice.
+            Return a JSON object:
+            {
+                "type": "QUICK WIN" or "LONG TERM BET",
+                "title": "Strategy Headline (e.g. Dominate Local Niche)",
+                "recommendation": "One paragraph strategic rationale.",
+                "execution_steps": ["Step 1", "Step 2", "Step 3"],
+                "impact": "Projected outcome..."
+            }
             Return strictly JSON.
         `;
 
         try {
             const raw = await callGemini(prompt);
             const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            setLearnMoreData(JSON.parse(clean));
+            setLearnMoreData([JSON.parse(clean)]); // Wrap in array to keep map logic or refactor
         } catch (e) {
             console.error("AI Error", e);
-            setLearnMoreData([
-                { title: "DOMESTIC EXPANSION", type: "LOWER RISK", recommendation: "Focus on capturing more market share in your home region.", impact: "Steady growth with lower capital risk." },
-                { title: "INTERNATIONAL EXPANSION", type: "HIGH REWARD", recommendation: "Export to markets with similar regulatory frameworks.", impact: "Potential for exponential revenue scaling." }
-            ]);
+            setLearnMoreData([{
+                title: `${typeToAnalyze} EXECUTION PLAN`,
+                type: "RECOMMENDED PATH",
+                recommendation: `Focus on ${typeToAnalyze.toLowerCase()} markets to leverage your current strengths in ${profile.industry}.`,
+                execution_steps: ["Audit current capabilities", "Identify key pilot markets", "Align sales incentives"],
+                impact: "Steady revenue growth with manageable risk."
+            }]);
         }
         setLearnMoreLoading(false);
     };
@@ -564,7 +566,10 @@ export default function ProfileWizard() {
                     <StepContainer title="Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div
-                                onClick={() => setProfile({ ...profile, ventureType: 'Domestic' })}
+                                onClick={() => {
+                                    setProfile({ ...profile, ventureType: 'Domestic' });
+                                    handleLearnMore('Domestic');
+                                }}
                                 className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'Domestic' ? 'border-red-600 bg-red-50' : 'border-gray-100 bg-white hover:border-red-200'}`}
                             >
                                 <div className="p-3 bg-orange-100 text-orange-600 rounded-full"><Building2 /></div>
@@ -573,7 +578,10 @@ export default function ProfileWizard() {
                             </div>
 
                             <div
-                                onClick={() => setProfile({ ...profile, ventureType: 'International' })}
+                                onClick={() => {
+                                    setProfile({ ...profile, ventureType: 'International' });
+                                    handleLearnMore('International');
+                                }}
                                 className={`cursor-pointer p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${profile.ventureType === 'International' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-100 bg-white hover:border-indigo-200'}`}
                             >
                                 <div className="p-3 bg-blue-100 text-blue-600 rounded-full"><Globe /></div>
@@ -599,255 +607,263 @@ export default function ProfileWizard() {
                         {/* Learn More Sidebar (Right Side Slide-in) */}
                         {/* Learn More: Contextual Split-Panel Drawer */}
                         {showLearnMore && (
-                            <>
-                                {/* Backdrop for focus, but lighter to maintain context feel */}
-                                <div
-                                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity duration-300"
-                                    onClick={() => setShowLearnMore(false)}
-                                ></div>
+                            <div className="fixed top-0 right-0 h-full w-full md:w-[45%] bg-[#0f172a] shadow-2xl z-50 border-l border-gray-800 animate-in slide-in-from-right duration-500 flex flex-col">
 
-                                {/* The Right-Side Panel */}
-                                <div className="fixed top-0 right-0 h-full w-full md:w-[48%] lg:w-[40%] bg-[#0f172a] shadow-2xl z-50 border-l border-gray-800 overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col">
-
-                                    {/* Header Section */}
-                                    <div className="sticky top-0 bg-[#0f172a]/95 backdrop-blur z-10 px-8 py-6 border-b border-gray-800 flex justify-between items-start">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-2 text-yellow-500 font-bold text-xs tracking-widest uppercase">
-                                                <Sparkles size={14} /> Strategic Intelligence
-                                            </div>
-                                            <h3 className="text-2xl font-bold text-white leading-tight">
-                                                Contextual Analysis
-                                            </h3>
-                                            <p className="text-gray-400 text-sm mt-1">
-                                                For <span className="text-white font-medium">{profile.companyName}</span>
-                                            </p>
+                                {/* Header Section */}
+                                <div className="sticky top-0 bg-[#0f172a]/95 backdrop-blur z-10 px-8 py-6 border-b border-gray-800 flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2 text-yellow-500 font-bold text-xs tracking-widest uppercase">
+                                            <Sparkles size={14} /> Strategic Intelligence
                                         </div>
-                                        <button
-                                            onClick={() => setShowLearnMore(false)}
-                                            className="text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
-                                            title="Close Panel"
-                                        >
-                                            <X size={24} />
-                                        </button>
-                                    </div>
-
-                                    {/* Scrollable Content */}
-                                    <div className="p-8 space-y-8 flex-1">
-                                        {learnMoreLoading ? (
-                                            <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
-                                                <div className="relative">
-                                                    <div className="absolute inset-0 bg-yellow-500 blur-xl opacity-20 animate-pulse"></div>
-                                                    <Loader2 className="relative w-16 h-16 text-yellow-500 animate-spin" />
-                                                </div>
-                                                <p className="mt-8 text-gray-400 font-medium text-lg animate-pulse">
-                                                    Synthesizing market data...
-                                                </p>
-                                                <p className="text-gray-600 text-sm mt-2">Comparing growth vectors for your industry</p>
-                                            </div>
-                                        ) : (
-                                            learnMoreData?.map((item, idx) => (
-                                                <div key={idx} className="group relative">
-                                                    {/* Connecting Line for timeline effect */}
-                                                    {idx !== learnMoreData.length - 1 && (
-                                                        <div className="absolute left-6 top-16 bottom-[-32px] w-0.5 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
-                                                    )}
-
-                                                    <div className="relative bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5">
-                                                        {/* Badge */}
-                                                        <div className="flex items-center justify-between mb-4">
-                                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${item.type.includes('WIN') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                                                                {item.type.includes('WIN') ? <CheckCircle size={12} /> : <Target size={12} />}
-                                                                {item.type}
-                                                            </span>
-                                                            <div className="text-gray-500 opacity-20">
-                                                                {item.title.includes('DOMESTIC') ? <Building2 size={24} /> : <Globe size={24} />}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Title */}
-                                                        <h4 className="text-xl font-bold text-white mb-3 tracking-tight">{item.title}</h4>
-
-                                                        {/* Body */}
-                                                        <p className="text-gray-300 text-sm leading-relaxed mb-6 border-l-2 border-gray-700 pl-4">
-                                                            {item.recommendation}
-                                                        </p>
-
-                                                        {/* Impact Box */}
-                                                        <div className="bg-[#0f172a] rounded-xl p-4 flex gap-4 border border-gray-800">
-                                                            <div className="mt-1 min-w-[20px]">
-                                                                <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                                                                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Projected Impact</div>
-                                                                <div className="text-sm font-medium text-yellow-50 leading-tight">
-                                                                    {item.impact}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-
-                                    {/* Footer */}
-                                    <div className="p-6 border-t border-gray-800 bg-[#0f172a] text-center">
-                                        <p className="text-xs text-gray-500">
-                                            AI inputs based on {profile.industry} trends & public market data.
+                                        <h3 className="text-2xl font-bold text-white leading-tight">
+                                            Contextual Analysis
+                                        </h3>
+                                        <p className="text-gray-400 text-sm mt-1">
+                                            For <span className="text-white font-medium">{profile.companyName}</span>
                                         </p>
                                     </div>
-                                </div>
-                            </>
-                        )}
-                    </StepContainer>
-                )}
-
-                {/* STEP 6: STRATEGY DESCRIPTION (NEW) */}
-                {step === 6 && (
-                    <StepContainer title="Describe your Strategy" onBack={handleBack} aiContext={aiContext}>
-                        <div className="space-y-6">
-                            <p className="text-gray-600 text-sm">Tell us more about how you plan to execute this. Use the AI chat for help.</p>
-
-                            <div className="relative">
-                                <textarea
-                                    rows={4}
-                                    value={profile.strategyDescription}
-                                    onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
-                                    className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none pr-12"
-                                    placeholder="e.g. We plan to partner with local distributors..."
-                                />
-                                <button className="absolute right-4 bottom-4 p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors" title="Record Voice">
-                                    <Mic size={20} />
-                                </button>
-                            </div>
-
-                            {/* AI Chat Interface */}
-                            <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
-                                <div className="flex items-center gap-2 mb-3 text-indigo-800 font-bold text-xs uppercase tracking-wide">
-                                    <Sparkles size={14} /> AI Strategy Assistant
-                                </div>
-                                <div className="h-32 overflow-y-auto mb-3 space-y-2 pr-2">
-                                    {chatMessages.map((msg, i) => (
-                                        <div key={i} className={`text-sm p-2 rounded-lg ${msg.role === 'user' ? 'bg-white ml-auto max-w-[80%]' : 'bg-indigo-100 mr-auto max-w-[90%]'}`}>
-                                            {msg.text}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={chatInput}
-                                        onChange={e => setChatInput(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && handleChatSubmit()}
-                                        className="flex-1 p-2 text-sm border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-400"
-                                        placeholder="Ask for suggestions..."
-                                    />
-                                    <button onClick={handleChatSubmit} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                                        <Send size={16} />
+                                    <button
+                                        onClick={() => setShowLearnMore(false)}
+                                        className="absolute top-6 right-6 text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
+                                        title="Close Panel"
+                                    >
+                                        <X size={24} />
                                     </button>
                                 </div>
+
+                                {/* Scrollable Content */}
+                                <div className="p-8 space-y-8 flex-1">
+                                    {learnMoreLoading ? (
+                                        <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
+                                            <div className="relative">
+                                                <div className="absolute inset-0 bg-yellow-500 blur-xl opacity-20 animate-pulse"></div>
+                                                <Loader2 className="relative w-16 h-16 text-yellow-500 animate-spin" />
+                                            </div>
+                                            <p className="mt-8 text-gray-400 font-medium text-lg animate-pulse">
+                                                Synthesizing market data...
+                                            </p>
+                                            <p className="text-gray-600 text-sm mt-2">Comparing growth vectors for your industry</p>
+                                        </div>
+                                    ) : (
+                                        learnMoreData?.map((item, idx) => (
+                                            <div key={idx} className="group relative">
+                                                {/* Connecting Line for timeline effect */}
+                                                {idx !== learnMoreData.length - 1 && (
+                                                    <div className="absolute left-6 top-16 bottom-[-32px] w-0.5 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
+                                                )}
+
+                                                <div className="relative bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5">
+                                                    {/* Badge */}
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${item.type.includes('WIN') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
+                                                            {item.type.includes('WIN') ? <CheckCircle size={12} /> : <Target size={12} />}
+                                                            {item.type}
+                                                        </span>
+                                                        <div className="text-gray-500 opacity-20">
+                                                            {item.title.includes('DOMESTIC') ? <Building2 size={24} /> : <Globe size={24} />}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Title */}
+                                                    <h4 className="text-xl font-bold text-white mb-3 tracking-tight">{item.title}</h4>
+
+                                                    {/* Body */}
+                                                    <p className="text-gray-300 text-sm leading-relaxed mb-6 border-l-2 border-gray-700 pl-4">
+                                                        {item.recommendation}
+                                                    </p>
+
+                                                    {/* Execution Steps */}
+                                                    {item.execution_steps && (
+                                                        <div className="mb-6">
+                                                            <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Execution Strategy</p>
+                                                            <ul className="space-y-2">
+                                                                {item.execution_steps.map((step, sIdx) => (
+                                                                    <li key={sIdx} className="text-sm text-gray-300 flex items-start gap-2">
+                                                                        <div className="mt-1.5 w-1 h-1 rounded-full bg-yellow-400"></div>
+                                                                        {step}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Projected Impact</div>
+                                                    <div className="text-sm font-medium text-yellow-50 leading-tight">
+                                                        {item.impact}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                                    </div>
                             </div>
+                        ))
+                                        )}
+                    </div>
 
-                            <button onClick={handleNext} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                                Next
-                            </button>
-                        </div>
-                    </StepContainer>
-                )}
-
-                {/* STEP 7: SUPPORT NEEDED */}
-                {step === 7 && (
-                    <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
-                        <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {supportOptions.map(opt => (
-                                <div
-                                    key={opt.id}
-                                    onClick={() => toggleSupport(opt.id)}
-                                    className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center gap-3 ${profile.supportNeeded.includes(opt.id) ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
-                                >
-                                    <opt.icon size={18} className={profile.supportNeeded.includes(opt.id) ? 'text-red-600' : 'text-gray-400'} />
-                                    <span className={`text-sm font-semibold ${profile.supportNeeded.includes(opt.id) ? 'text-red-900' : 'text-gray-600'}`}>{opt.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                        <button onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                            Next
-                        </button>
-                    </StepContainer>
-                )}
-
-                {/* STEP 8: COMMITMENT */}
-                {step === 8 && (
-                    <StepContainer title="Commitment Check" onBack={handleBack} aiContext={aiContext}>
-                        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                            <h3 className="font-bold text-gray-900 mb-4">Are you willing to dedicate 4-6 hours per week specifically to drive this initiative?</h3>
-                            <div className="space-y-3">
-                                <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
-                                    <input
-                                        type="radio"
-                                        name="commitment"
-                                        value="Yes"
-                                        onChange={e => setProfile({ ...profile, commitmentHours: e.target.value })}
-                                        checked={profile.commitmentHours === 'Yes'}
-                                        className="w-5 h-5 text-red-600"
-                                    />
-                                    <span className="font-medium">Yes, I am fully committed.</span>
-                                </label>
-                                <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
-                                    <input
-                                        type="radio"
-                                        name="commitment"
-                                        value="No"
-                                        onChange={e => setProfile({ ...profile, commitmentHours: e.target.value })}
-                                        checked={profile.commitmentHours === 'No'}
-                                        className="w-5 h-5 text-red-600"
-                                    />
-                                    <span className="font-medium">No, I can't spare that much time right now.</span>
-                                </label>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleNext}
-                            disabled={!profile.commitmentHours}
-                            className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-50"
-                        >
-                            Almost Done
-                        </button>
-                    </StepContainer>
-                )}
-
-                {/* STEP 9: TEAM */}
-                {step === 9 && (
-                    <StepContainer title="Assign a Growth Lead" onBack={handleBack} aiContext={aiContext}>
-                        <div className="space-y-6">
-                            <p className="text-gray-600 text-sm">Success requires ownership. Who will be the dedicated 'Growth Lead' from your team to own the sprint deliverables?</p>
-
-                            <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Lead Name / Role</label>
-                                <input
-                                    type="text"
-                                    value={profile.growthLead}
-                                    onChange={e => setProfile({ ...profile, growthLead: e.target.value })}
-                                    className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-lg"
-                                    placeholder="e.g. Sarah J. (Marketing Head)"
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleSave}
-                                disabled={!profile.growthLead}
-                                className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 hover:shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                <Save size={20} /> Complete Profile & Launch
-                            </button>
-                        </div>
-                    </StepContainer>
-                )}
-
+                                
+                                {/* Footer */}
+                <div className="p-6 border-t border-gray-800 bg-[#0f172a] text-center">
+                    <p className="text-xs text-gray-500">
+                        AI inputs based on {profile.industry} trends & public market data.
+                    </p>
+                </div>
             </div>
+                        )}
+        </StepContainer>
+    )
+}
+
+{/* STEP 6: STRATEGY DESCRIPTION (NEW) */ }
+{
+    step === 6 && (
+        <StepContainer title="Describe your Strategy" onBack={handleBack} aiContext={aiContext}>
+            <div className="space-y-6">
+                <p className="text-gray-600 text-sm">Tell us more about how you plan to execute this. Use the AI chat for help.</p>
+
+                <div className="relative">
+                    <textarea
+                        rows={4}
+                        value={profile.strategyDescription}
+                        onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
+                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none pr-12"
+                        placeholder="e.g. We plan to partner with local distributors..."
+                    />
+                    <button className="absolute right-4 bottom-4 p-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-colors" title="Record Voice">
+                        <Mic size={20} />
+                    </button>
+                </div>
+
+                {/* AI Chat Interface */}
+                <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100">
+                    <div className="flex items-center gap-2 mb-3 text-indigo-800 font-bold text-xs uppercase tracking-wide">
+                        <Sparkles size={14} /> AI Strategy Assistant
+                    </div>
+                    <div className="h-32 overflow-y-auto mb-3 space-y-2 pr-2">
+                        {chatMessages.map((msg, i) => (
+                            <div key={i} className={`text-sm p-2 rounded-lg ${msg.role === 'user' ? 'bg-white ml-auto max-w-[80%]' : 'bg-indigo-100 mr-auto max-w-[90%]'}`}>
+                                {msg.text}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleChatSubmit()}
+                            className="flex-1 p-2 text-sm border border-indigo-200 rounded-lg focus:outline-none focus:border-indigo-400"
+                            placeholder="Ask for suggestions..."
+                        />
+                        <button onClick={handleChatSubmit} className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                            <Send size={16} />
+                        </button>
+                    </div>
+                </div>
+
+                <button onClick={handleNext} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                    Next
+                </button>
+            </div>
+        </StepContainer>
+    )
+}
+
+{/* STEP 7: SUPPORT NEEDED */ }
+{
+    step === 7 && (
+        <StepContainer title="How can Wadhwani help?" onBack={handleBack} aiContext={aiContext}>
+            <p className="text-gray-500 mb-6 text-sm">Select all areas where you need expert guidance.</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {supportOptions.map(opt => (
+                    <div
+                        key={opt.id}
+                        onClick={() => toggleSupport(opt.id)}
+                        className={`cursor-pointer p-4 rounded-xl border transition-all flex items-center gap-3 ${profile.supportNeeded.includes(opt.id) ? 'border-red-500 bg-red-50 ring-1 ring-red-500' : 'border-gray-200 bg-white hover:bg-gray-50'}`}
+                    >
+                        <opt.icon size={18} className={profile.supportNeeded.includes(opt.id) ? 'text-red-600' : 'text-gray-400'} />
+                        <span className={`text-sm font-semibold ${profile.supportNeeded.includes(opt.id) ? 'text-red-900' : 'text-gray-600'}`}>{opt.label}</span>
+                    </div>
+                ))}
+            </div>
+            <button onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                Next
+            </button>
+        </StepContainer>
+    )
+}
+
+{/* STEP 8: COMMITMENT */ }
+{
+    step === 8 && (
+        <StepContainer title="Commitment Check" onBack={handleBack} aiContext={aiContext}>
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                <h3 className="font-bold text-gray-900 mb-4">Are you willing to dedicate 4-6 hours per week specifically to drive this initiative?</h3>
+                <div className="space-y-3">
+                    <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input
+                            type="radio"
+                            name="commitment"
+                            value="Yes"
+                            onChange={e => setProfile({ ...profile, commitmentHours: e.target.value })}
+                            checked={profile.commitmentHours === 'Yes'}
+                            className="w-5 h-5 text-red-600"
+                        />
+                        <span className="font-medium">Yes, I am fully committed.</span>
+                    </label>
+                    <label className="flex items-center gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input
+                            type="radio"
+                            name="commitment"
+                            value="No"
+                            onChange={e => setProfile({ ...profile, commitmentHours: e.target.value })}
+                            checked={profile.commitmentHours === 'No'}
+                            className="w-5 h-5 text-red-600"
+                        />
+                        <span className="font-medium">No, I can't spare that much time right now.</span>
+                    </label>
+                </div>
+            </div>
+            <button
+                onClick={handleNext}
+                disabled={!profile.commitmentHours}
+                className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors disabled:opacity-50"
+            >
+                Almost Done
+            </button>
+        </StepContainer>
+    )
+}
+
+{/* STEP 9: TEAM */ }
+{
+    step === 9 && (
+        <StepContainer title="Assign a Growth Lead" onBack={handleBack} aiContext={aiContext}>
+            <div className="space-y-6">
+                <p className="text-gray-600 text-sm">Success requires ownership. Who will be the dedicated 'Growth Lead' from your team to own the sprint deliverables?</p>
+
+                <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Lead Name / Role</label>
+                    <input
+                        type="text"
+                        value={profile.growthLead}
+                        onChange={e => setProfile({ ...profile, growthLead: e.target.value })}
+                        className="w-full p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-lg"
+                        placeholder="e.g. Sarah J. (Marketing Head)"
+                    />
+                </div>
+
+                <button
+                    onClick={handleSave}
+                    disabled={!profile.growthLead}
+                    className="w-full py-4 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-200 hover:shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                    <Save size={20} /> Complete Profile & Launch
+                </button>
+            </div>
+        </StepContainer>
+    )
+}
+
+            </div >
         </div >
     );
 }
