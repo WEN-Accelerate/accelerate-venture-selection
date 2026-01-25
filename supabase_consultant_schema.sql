@@ -148,6 +148,7 @@ SELECT
     p.details->>'industry' as industry,
     p.details->>'ventureType' as venture_type,
     p.details->>'strategyDescription' as strategy,
+    p.details, -- Include full details for progress calculation
     p.updated_at as last_updated,
     ca.assigned_at,
     ca.notes
