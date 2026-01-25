@@ -1,16 +1,25 @@
 -- =====================================================
--- CONSULTANT LAYER SCHEMA
+-- CONSULTANT LAYER SCHEMA (FIXED VERSION)
 -- =====================================================
--- This extends the existing profiles table with consultant functionality
+-- This version removes foreign key constraints to avoid "column id does not exist" errors
+-- It relies on application logic and unique constraints for integrity
 
--- 1. Add role column to existing profiles table
-ALTER TABLE profiles 
-ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'sme' CHECK (role IN ('sme', 'consultant', 'admin'));
+-- Step 1: Add role column to profiles table
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'profiles' AND column_name = 'role'
+    ) THEN
+        ALTER TABLE profiles ADD COLUMN role TEXT DEFAULT 'sme';
+        ALTER TABLE profiles ADD CONSTRAINT check_role CHECK (role IN ('sme', 'consultant', 'admin'));
+    END IF;
+END $$;
 
--- 2. Create consultants table for consultant-specific data
+-- Step 2: Create consultants table (NO foreign key constraints)
 CREATE TABLE IF NOT EXISTS consultants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id TEXT UNIQUE NOT NULL,
+    user_id TEXT UNIQUE NOT NULL, -- Logical link to profiles.user_id
     consultant_name TEXT NOT NULL,
     email TEXT NOT NULL,
     phone TEXT,
@@ -18,50 +27,45 @@ CREATE TABLE IF NOT EXISTS consultants (
     bio TEXT,
     active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    -- Foreign key to profiles table
-    CONSTRAINT fk_consultant_user FOREIGN KEY (user_id) 
-        REFERENCES profiles(user_id) ON DELETE CASCADE
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. Create company_assignments table (many-to-many relationship)
+-- Step 3: Create company_assignments table (NO foreign key constraints)
 CREATE TABLE IF NOT EXISTS company_assignments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    consultant_id UUID NOT NULL,
-    company_user_id TEXT NOT NULL,
+    consultant_id UUID NOT NULL, -- Logical link to consultants.id
+    company_user_id TEXT NOT NULL, -- Logical link to profiles.user_id
     assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    assigned_by TEXT, -- admin user_id who made the assignment
+    assigned_by TEXT,
     notes TEXT,
-    
-    -- Foreign keys
-    CONSTRAINT fk_assignment_consultant FOREIGN KEY (consultant_id) 
-        REFERENCES consultants(id) ON DELETE CASCADE,
-    CONSTRAINT fk_assignment_company FOREIGN KEY (company_user_id) 
-        REFERENCES profiles(user_id) ON DELETE CASCADE,
-    
-    -- Ensure unique assignments
     UNIQUE(consultant_id, company_user_id)
 );
 
--- 4. Create indexes for performance
+-- Step 4: Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_consultants_user_id ON consultants(user_id);
 CREATE INDEX IF NOT EXISTS idx_consultants_active ON consultants(active);
 CREATE INDEX IF NOT EXISTS idx_company_assignments_consultant ON company_assignments(consultant_id);
 CREATE INDEX IF NOT EXISTS idx_company_assignments_company ON company_assignments(company_user_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 
--- 5. Enable Row Level Security (RLS)
+-- Step 5: Enable Row Level Security
 ALTER TABLE consultants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_assignments ENABLE ROW LEVEL SECURITY;
 
--- 6. RLS Policies for consultants table
--- Consultants can view their own record
+-- Step 6: Cleanup old policies to avoid conflicts
+DROP POLICY IF EXISTS "Consultants can view own record" ON consultants;
+DROP POLICY IF EXISTS "Admins can view all consultants" ON consultants;
+DROP POLICY IF EXISTS "Admins can manage consultants" ON consultants;
+DROP POLICY IF EXISTS "Consultants can view their assignments" ON company_assignments;
+DROP POLICY IF EXISTS "Admins can view all assignments" ON company_assignments;
+DROP POLICY IF EXISTS "Admins can manage assignments" ON company_assignments;
+DROP POLICY IF EXISTS "Consultants can view assigned companies" ON profiles;
+
+-- Step 7: Create RLS policies for consultants table
 CREATE POLICY "Consultants can view own record" ON consultants
     FOR SELECT
-    USING (auth.uid()::text = user_id);
+    USING (user_id = auth.uid()::text);
 
--- Admins can view all consultants
 CREATE POLICY "Admins can view all consultants" ON consultants
     FOR SELECT
     USING (
@@ -72,7 +76,6 @@ CREATE POLICY "Admins can view all consultants" ON consultants
         )
     );
 
--- Admins can insert/update/delete consultants
 CREATE POLICY "Admins can manage consultants" ON consultants
     FOR ALL
     USING (
@@ -83,17 +86,16 @@ CREATE POLICY "Admins can manage consultants" ON consultants
         )
     );
 
--- 7. RLS Policies for company_assignments table
--- Consultants can view their assignments
+-- Step 8: Create RLS policies for company_assignments
 CREATE POLICY "Consultants can view their assignments" ON company_assignments
     FOR SELECT
     USING (
         consultant_id IN (
-            SELECT id FROM consultants WHERE user_id = auth.uid()::text
+            SELECT id FROM consultants 
+            WHERE user_id = auth.uid()::text
         )
     );
 
--- Admins can view all assignments
 CREATE POLICY "Admins can view all assignments" ON company_assignments
     FOR SELECT
     USING (
@@ -104,7 +106,6 @@ CREATE POLICY "Admins can view all assignments" ON company_assignments
         )
     );
 
--- Admins can manage assignments
 CREATE POLICY "Admins can manage assignments" ON company_assignments
     FOR ALL
     USING (
@@ -115,7 +116,7 @@ CREATE POLICY "Admins can manage assignments" ON company_assignments
         )
     );
 
--- 8. Update profiles RLS to allow consultants to view assigned companies
+-- Step 9: Create policy for consultants to view assigned companies
 CREATE POLICY "Consultants can view assigned companies" ON profiles
     FOR SELECT
     USING (
@@ -123,13 +124,14 @@ CREATE POLICY "Consultants can view assigned companies" ON profiles
             SELECT company_user_id 
             FROM company_assignments 
             WHERE consultant_id IN (
-                SELECT id FROM consultants WHERE user_id = auth.uid()::text
+                SELECT id FROM consultants 
+                WHERE user_id = auth.uid()::text
             )
         )
         OR user_id = auth.uid()::text
     );
 
--- 9. Create view for consultant dashboard
+-- Step 10: Create view for consultant dashboard
 CREATE OR REPLACE VIEW consultant_companies_view AS
 SELECT 
     ca.consultant_id,
@@ -145,19 +147,20 @@ FROM company_assignments ca
 JOIN profiles p ON ca.company_user_id = p.user_id
 WHERE p.role = 'sme';
 
--- 10. Grant permissions on the view
+-- Step 11: Grant permissions
 GRANT SELECT ON consultant_companies_view TO authenticated;
+GRANT SELECT ON consultants TO authenticated;
+GRANT SELECT ON company_assignments TO authenticated;
 
--- =====================================================
--- SAMPLE DATA (for testing - remove in production)
--- =====================================================
--- Example: Create a test consultant
--- INSERT INTO profiles (user_id, company_name, role, details)
--- VALUES ('consultant_test_001', 'Test Consultant', 'consultant', '{"email": "consultant@test.com"}'::jsonb);
-
--- INSERT INTO consultants (user_id, consultant_name, email, specialization)
--- VALUES ('consultant_test_001', 'John Doe', 'consultant@test.com', 'Export Strategy');
-
+-- Step 12: Add helpful comments
 COMMENT ON TABLE consultants IS 'Stores consultant/advisor profiles';
 COMMENT ON TABLE company_assignments IS 'Maps consultants to their assigned SME companies';
 COMMENT ON COLUMN profiles.role IS 'User role: sme (default), consultant, or admin';
+
+-- =====================================================
+-- SUCCESS MESSAGE
+-- =====================================================
+DO $$ 
+BEGIN
+    RAISE NOTICE '✅ Consultant layer schema created successfully!';
+END $$;
