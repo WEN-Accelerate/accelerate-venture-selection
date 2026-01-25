@@ -641,7 +641,6 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 return;
             }
             const ai = new GoogleGenAI({ apiKey });
-            const model = ai.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
             const prompt = `
                 Act as a Strategy Consultant for a ${profile.industry} company.
@@ -662,9 +661,17 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 Return JSON only.
             `;
 
-            const result = await model.generateContent(prompt);
-            const response = result.response;
-            const text = response.text();
+            const result = await ai.models.generateContent({
+                model: "gemini-2.0-flash-exp",
+                contents: prompt
+            });
+
+            // Handle response based on SDK version variability
+            let text = result.text;
+            if (typeof text === 'function') text = text();
+            if (!text && result.candidates && result.candidates[0]) {
+                text = result.candidates[0].content.parts[0].text;
+            }
 
             // Loose JSON parsing
             const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -873,8 +880,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                                 <button
                                                     onClick={() => updateSubAction(action.id, 'masterclass', !action.masterclass)}
                                                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.masterclass
-                                                            ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                                        ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                                        : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
                                                         }`}
                                                 >
                                                     <GraduationCap size={12} />
@@ -883,8 +890,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                                 <button
                                                     onClick={() => updateSubAction(action.id, 'expert', !action.expert)}
                                                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.expert
-                                                            ? 'bg-purple-50 border-purple-200 text-purple-700'
-                                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                                        ? 'bg-purple-50 border-purple-200 text-purple-700'
+                                                        : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
                                                         }`}
                                                 >
                                                     <MessageCircle size={12} />
@@ -893,8 +900,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                                 <button
                                                     onClick={() => updateSubAction(action.id, 'knowledgePack', !action.knowledgePack)}
                                                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.knowledgePack
-                                                            ? 'bg-amber-50 border-amber-200 text-amber-700'
-                                                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                                        : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
                                                         }`}
                                                 >
                                                     <Box size={12} />
