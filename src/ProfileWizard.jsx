@@ -774,7 +774,7 @@ export default function ProfileWizard() {
                             </button>
                         </div>
 
-                        <button key="next4" onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                        <button key="next4" onClick={handleNext} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
                             Next
                         </button>
                     </StepContainer>
@@ -1181,7 +1181,7 @@ export default function ProfileWizard() {
                                     <div key={i} className={`w-2 h-2 rounded-full transition-all ${supportStep === i ? 'bg-red-600 w-6' : 'bg-gray-200'}`}></div>
                                 ))}
                             </div>
-                            <button onClick={handleSupportNext} className="w-40 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                            <button onClick={handleSupportNext} className="w-40 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100">
                                 {supportStep === 1 ? 'Finish' : 'Next'}
                             </button>
                         </div>
