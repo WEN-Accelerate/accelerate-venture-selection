@@ -174,11 +174,54 @@ export default function DashboardMain() {
         </div>
     );
 
-    if (!profile) return (
-        <div className="flex items-center justify-center p-20 text-gray-400">
-            No profile data found. <a href="/index.html" className="text-red-600 underline ml-2">Return to Home</a>
-        </div>
-    );
+    if (!profile) {
+        if (loading) return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+                <Loader2 className="w-10 h-10 text-red-600 animate-spin mb-4" />
+                <p className="text-gray-500 font-medium">Loading Dashboard...</p>
+            </div>
+        );
+
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#F4F6F8] p-6 text-center">
+                <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Users className="text-red-600 w-8 h-8" />
+                    </div>
+
+                    {!user ? (
+                        <>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
+                            <p className="text-gray-500 mb-8">Please log in to access your operations dashboard.</p>
+                            <button
+                                onClick={() => netlifyIdentity.open()}
+                                className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all mb-4"
+                            >
+                                Log In
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Setup Required</h2>
+                            <p className="text-gray-500 mb-8">
+                                We couldn't find a business profile linked to <strong>{user.email || 'this account'}</strong>.
+                            </p>
+                            <a
+                                href="/index.html"
+                                className="block w-full py-3 bg-[#D32F2F] text-white font-bold rounded-xl hover:bg-red-800 transition-all mb-4"
+                            >
+                                Create New Profile
+                            </a>
+                        </>
+                    )}
+
+                    <a href="/index.html" className="text-sm text-gray-400 hover:text-gray-600 font-medium">
+                        Return to Home
+                    </a>
+                </div>
+            </div>
+        );
+    }
 
     const cards = getCards();
 
