@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
-    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles
+    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut
 } from 'lucide-react';
 
 // --- CONFIG ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
@@ -26,46 +22,81 @@ export default function DashboardMain() {
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                fetchProfile(currentUser.uid);
+        netlifyIdentity.init();
+
+        const currentUser = netlifyIdentity.currentUser();
+        if (currentUser) {
+            setUser({
+                uid: currentUser.id,
+                email: currentUser.email,
+                displayName: currentUser.user_metadata?.full_name,
+                isAnonymous: false
+            });
+            fetchProfile(currentUser.id);
+        } else {
+            // Fallback: Check for Guest ID
+            const guestId = localStorage.getItem('accelerate_guest_id');
+            if (guestId) {
+                checkGuestProfile(guestId);
             } else {
-                // If not logged in, first check if we have a Guest ID (from Wizard)
-                const guestId = localStorage.getItem('accelerate_guest_id');
-                if (guestId) {
-                    console.log("Found Guest ID:", guestId);
-                    // Try determining if this guest has a profile in Supabase
-                    const { data, error } = await supabase
-                        .from('profiles')
-                        .select('details')
-                        .eq('user_id', guestId)
-                        .maybeSingle();
-
-                    if (data && data.details) {
-                        setUser({ uid: guestId, isAnonymous: true });
-                        setProfile(data.details);
-                        setLoading(false);
-                        return;
-                    }
-                }
-
-                // Fallback: Check for local data blob (legacy or offline support)
+                // Fallback: Check for local data (legacy)
                 const localData = localStorage.getItem('user_profile_data');
                 if (localData) {
                     const parsed = JSON.parse(localData);
-                    // Mock user structure for local dev
                     setUser({ uid: 'guest', isAnonymous: true });
                     setProfile(parsed.details);
                     setLoading(false);
                 } else {
-                    // Start fresh or show error
                     setLoading(false);
+                    // Optionally redirect here if strict auth required
                 }
             }
+        }
+
+        netlifyIdentity.on('login', (user) => {
+            setUser({
+                uid: user.id,
+                email: user.email,
+                displayName: user.user_metadata?.full_name,
+                isAnonymous: false
+            });
+            fetchProfile(user.id);
         });
-        return () => unsubscribe();
+
+        netlifyIdentity.on('logout', () => {
+            setUser(null);
+            window.location.href = '/index.html';
+        });
+
+        return () => {
+            netlifyIdentity.off('login');
+            netlifyIdentity.off('logout');
+        };
     }, []);
+
+    const checkGuestProfile = async (guestId) => {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('details')
+            .eq('user_id', guestId)
+            .maybeSingle();
+
+        if (data && data.details) {
+            setUser({ uid: guestId, isAnonymous: true });
+            setProfile(data.details);
+        }
+        setLoading(false);
+    };
+
+    const handleLogout = () => {
+        if (user && user.isAnonymous) {
+            // Clear guest session
+            localStorage.removeItem('accelerate_guest_id'); // Optional: decide if we want to clear or keep
+            window.location.href = '/index.html';
+        } else {
+            netlifyIdentity.logout();
+        }
+    };
 
     const fetchProfile = async (uid) => {
         try {
@@ -144,47 +175,69 @@ export default function DashboardMain() {
     );
 
     if (!profile) return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
-            No profile data found. Please complete the setup wizard first.
+        <div className="flex items-center justify-center p-20 text-gray-400">
+            No profile data found. <a href="/index.html" className="text-red-600 underline ml-2">Return to Home</a>
         </div>
     );
 
     const cards = getCards();
 
     return (
-        <div className="min-h-screen bg-[#F8F9FA] font-sans text-gray-900 pb-20">
-
+        <div className="min-h-screen bg-[#F4F6F8] font-sans text-gray-900 selection:bg-red-100 selection:text-red-900">
             {/* HEADER */}
-            <header className="bg-white border-b border-gray-200 px-8 py-6 flex flex-col md:flex-row justify-between items-center gap-6 sticky top-0 z-30 shadow-sm">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-gray-900">Operations Dashboard</h1>
-                    <p className="text-gray-500 text-sm font-medium italic mt-1">Expansion Execution: {profile.companyName}</p>
-                </div>
+            <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+                <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <img
+                            src="https://wadhwanifoundation.org/wp-content/uploads/2023/10/Wadhwani-Foundation-Logo.png"
+                            alt="Wadhwani Foundation"
+                            className="h-8 w-auto object-contain"
+                        />
+                        <div className="h-4 w-[1px] bg-gray-300 mx-1"></div>
+                        <h1 className="text-xl font-bold font-barlow tracking-tight text-gray-900">
+                            Accelerate <span className="text-red-600">Dashboard</span>
+                        </h1>
+                    </div>
 
-                {/* VIEW MODE TOGGLE */}
-                <div className="bg-gray-100 p-1 rounded-xl flex gap-1 shadow-inner relative">
-                    <button
-                        onClick={() => setViewMode('context')}
-                        className={`px-8 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 ${viewMode === 'context'
-                            ? 'bg-gray-900 text-white shadow-lg transform scale-105 ring-1 ring-gray-900/10'
-                            : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
-                            }`}
-                    >
-                        Strategic Context
-                    </button>
-                    <button
-                        onClick={() => setViewMode('sprint')}
-                        className={`px-8 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 ${viewMode === 'sprint'
-                            ? 'bg-[#D32F2F] text-white shadow-lg transform scale-105 ring-1 ring-red-900/10'
-                            : 'text-gray-400 hover:text-red-900 hover:bg-red-50'
-                            }`}
-                    >
-                        Execution Sprint
-                    </button>
+                    {/* CENTER: VIEW MODE TOGGLE */}
+                    <div className="bg-gray-100 p-1 rounded-xl flex gap-1 shadow-inner relative">
+                        <button
+                            onClick={() => setViewMode('context')}
+                            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
+                                ? 'bg-gray-900 text-white shadow-lg transform scale-105 ring-1 ring-gray-900/10'
+                                : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
+                                }`}
+                        >
+                            <Sparkles size={12} className={viewMode === 'context' ? 'text-yellow-400' : ''} />
+                            Blueprint
+                        </button>
+                        <button
+                            onClick={() => setViewMode('sprint')}
+                            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
+                                ? 'bg-[#D32F2F] text-white shadow-lg transform scale-105 ring-1 ring-red-900/10'
+                                : 'text-gray-400 hover:text-red-900 hover:bg-red-50'
+                                }`}
+                        >
+                            <Target size={12} />
+                            Sprint
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className="text-right hidden md:block">
+                            <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-all"
+                            title="Log Out"
+                        >
+                            <LogOut size={20} />
+                        </button>
+                    </div>
                 </div>
             </header>
-
-            {/* MAIN CONTENT AREA */}
             <main className="max-w-7xl mx-auto px-8 pt-8 pb-20">
 
                 {/* VIEW: CONTEXT (STRATEGY BLUEPRINT) */}
@@ -194,13 +247,20 @@ export default function DashboardMain() {
                         {/* 1. HEADER CARD */}
                         <div className="bg-gray-900 text-white rounded-2xl p-8 shadow-xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Sparkles className="text-yellow-400 w-4 h-4" />
-                                    <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-400 uppercase">Strategic Blueprint</span>
+                            <div className="relative z-10 flex items-start justify-between">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Sparkles className="text-yellow-400 w-4 h-4" />
+                                        <span className="text-[10px] font-bold tracking-[0.2em] text-yellow-400 uppercase">Strategic Blueprint</span>
+                                    </div>
+                                    <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
+                                    <p className="text-gray-400 text-sm">Review your expansion roadmap before proceeding.</p>
                                 </div>
-                                <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
-                                <p className="text-gray-400 text-sm">Review your expansion roadmap before proceeding.</p>
+                                {profile.logoUrl && (
+                                    <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
+                                        <img src={profile.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                    </div>
+                                )}
                             </div>
                         </div>
 

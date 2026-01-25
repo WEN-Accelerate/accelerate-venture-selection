@@ -605,6 +605,15 @@ export default function ProfileWizard() {
                             {/* Short Fields Row */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Logo URL</label>
+                                    <input
+                                        value={profile.logoUrl || ''}
+                                        onChange={e => setProfile({ ...profile, logoUrl: e.target.value })}
+                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                        placeholder="https://example.com/logo.png"
+                                    />
+                                </div>
+                                <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Industry</label>
                                     <input
                                         value={profile.industry}
@@ -612,6 +621,9 @@ export default function ProfileWizard() {
                                         className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Employees</label>
                                     <input
