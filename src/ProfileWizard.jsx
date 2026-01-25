@@ -38,7 +38,7 @@ const BRAND_COLORS = {
 // --- AI HELPER ---
 const callGemini = async (prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-    const model = "gemini-3-flash-preview";
+    const model = "gemini-2.0-flash-exp";
 
     if (!apiKey) return "AI simulation: Gemini response placeholder.";
 
@@ -196,9 +196,21 @@ export default function ProfileWizard() {
                 }
             });
 
-            // Handle potential null/undefined text
-            const rawText = response.text || "{}";
+            // Handle potential null/undefined text - try property first, then method if exists
+            let rawText = response.text;
+            if (typeof rawText === 'function') {
+                rawText = rawText(); // handle if it's a method in this SDK version
+            }
+            if (!rawText) rawText = "{}";
+
+            console.log("AI Raw Response:", rawText); // DEBUG
             const data = JSON.parse(rawText);
+            console.log("Parsed Data:", data); // DEBUG
+
+            if (!data.name && !data.industry) {
+                console.warn("AI returned empty structured data.");
+                throw new Error("Empty AI Data");
+            }
 
             setProfile(prev => ({
                 ...prev,
