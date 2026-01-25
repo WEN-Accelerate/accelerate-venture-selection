@@ -139,6 +139,36 @@ export default function DashboardMain() {
                 }
             }
 
+            // 3. If STILL not found, check LocalStorage Fallback (user_profile_data)
+            // This handles cases where Supabase write failed in Wizard, but Local write succeeded.
+            if ((!data || !data.details) && localStorage.getItem('user_profile_data')) {
+                console.log("Found disconnected local profile data. Adopting...");
+                try {
+                    const localData = JSON.parse(localStorage.getItem('user_profile_data'));
+                    if (localData && localData.details) {
+                        data = { details: localData.details }; // Use local data
+
+                        // SYNC ATTEMPT: Try to push this local data to Supabase now that we are here
+                        // We don't await this to keep UI fast
+                        supabase.from('profiles').upsert([{
+                            user_id: uid,
+                            company_name: localData.companyName || 'My Company',
+                            details: localData.details,
+                            updated_at: new Date()
+                        }], { onConflict: 'user_id' }).then(({ error }) => {
+                            if (!error) {
+                                console.log("Background Sync: Restored local profile to server.");
+                                localStorage.removeItem('user_profile_data'); // Cleanup on success
+                            } else {
+                                console.warn("Background Sync Failed:", error);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.error("Local profile parse error", e);
+                }
+            }
+
             if (data && data.details) {
                 setProfile(data.details);
             }
