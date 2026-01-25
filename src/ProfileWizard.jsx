@@ -298,11 +298,12 @@ export default function ProfileWizard() {
     }, [step]);
 
     // --- STEP 8: SUPPORT DETAILS ---
+    // Reordered for 2-screen split: Screen 1 (Growth/Market) vs Screen 2 (Ops/Finance)
     const SUPPORT_SUB_DOMAINS = {
         'Product': ['Market Fit', 'Feature Roadmap', 'Tech Stack', 'UI/UX Design', 'Quality QA'],
-        'Money': ['Fundraising', 'Valuation', 'Financial Modeling', 'Grant Strategy', 'Cash Flow'],
-        'Placement': ['Channel Entry', 'Logistics Setup', 'E-commerce Ops', 'Retail Partnerships', 'Supply Chain'],
         'Selling': ['Sales Scripting', 'Lead Generation', 'CRM Setup', 'Sales Training', 'Closing Strategies'],
+        'Placement': ['Channel Entry', 'Logistics Setup', 'E-commerce Ops', 'Retail Partnerships', 'Supply Chain'],
+        'Money': ['Fundraising', 'Valuation', 'Financial Modeling', 'Grant Strategy', 'Cash Flow'],
         'People': ['Org Structure', 'Hiring Key Roles', 'ESOP Planning', 'Culture Building', 'Performance Mgmt'],
         'Process': ['Legal / Compliance', 'Accounting Setup', 'Agile Implementation', 'KPI Dashboards', 'Ops Manuals']
     };
@@ -324,7 +325,7 @@ export default function ProfileWizard() {
     };
 
     const handleSupportNext = () => {
-        if (supportStep < 2) {
+        if (supportStep < 1) { // 2 pages total (0, 1)
             setSupportStep(prev => prev + 1);
         } else {
             handleNext();
@@ -992,6 +993,15 @@ export default function ProfileWizard() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Expansion Summary Block */}
+                            {profile.strategyDescription && (
+                                <div className="bg-white/5 p-4 rounded-xl border border-white/10 mt-4">
+                                    <div className="text-[10px] uppercase text-gray-400 tracking-wider mb-2 font-bold">Expansion Summary</div>
+                                    <p className="text-gray-200 text-sm italic">"{profile.strategyDescription}"</p>
+                                </div>
+                            )}
+
                         </div>
                         <button onClick={handleNext} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors">
                             Looks Good, Continue
@@ -1001,54 +1011,81 @@ export default function ProfileWizard() {
 
                 {/* STEP 8: HELP NEEDED */}
                 {step === 8 && (
-                    <StepContainer title={`Support Assessment`} onBack={handleBack} aiContext={aiContext}>
-                        <p className="text-gray-500 mb-6 text-sm">Review your capabilities across these 6 key dimensions.</p>
+                    <StepContainer title={`Support Assessment (${supportStep + 1}/2)`} onBack={handleSupportBack} aiContext={aiContext}>
+                        <p className="text-gray-500 mb-6 text-sm">Select your execution model for each critical sub-area.</p>
 
-                        <div className="space-y-8">
-                            {Object.entries(SUPPORT_SUB_DOMAINS).map(([category, subItems]) => (
-                                <div key={category} className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-                                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
-                                        <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-                                            {category}
-                                        </h3>
-                                        <button
-                                            onClick={() => handleLearnMoreCategory(category)}
-                                            className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded flex items-center gap-1 hover:bg-indigo-100"
-                                        >
-                                            <Sparkles size={12} /> Explain
-                                        </button>
-                                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {Object.entries(SUPPORT_SUB_DOMAINS)
+                                .slice(supportStep * 3, supportStep * 3 + 3)
+                                .map(([category, subItems]) => (
+                                    <div key={category} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-all">
+                                        {/* Card Header */}
+                                        <div className="flex justify-between items-start mb-6">
+                                            <h3 className="text-xl font-black text-gray-900 tracking-tight">{category} Support</h3>
+                                            <div className="p-2 bg-red-50 text-red-600 rounded-xl">
+                                                {category === 'Product' && <Target size={18} />}
+                                                {category === 'Money' && <DollarSign size={18} />}
+                                                {category === 'Placement' && <Globe size={18} />}
+                                                {category === 'Selling' && <Sparkles size={18} />}
+                                                {category === 'People' && <Users size={18} />}
+                                                {category === 'Process' && <Building2 size={18} />}
+                                            </div>
+                                        </div>
 
-                                    <div className="space-y-3">
-                                        {subItems.map(item => {
-                                            const val = profile.supportDetails?.[`${category}_${item}`] || 'NA';
-                                            return (
-                                                <div key={item} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                                                    <span className="text-gray-600 font-medium">{item}</span>
-                                                    <div className="flex bg-gray-50 p-1 rounded-lg">
-                                                        {['WF', 'Self', 'NA'].map(opt => (
+                                        {/* Sub Items List */}
+                                        <div className="space-y-6 flex-1">
+                                            {subItems.map(item => {
+                                                const val = profile.supportDetails?.[`${category}_${item}`] || 'NA';
+                                                return (
+                                                    <div key={item} className="space-y-1.5">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="font-bold text-gray-700 text-xs">{item}</span>
                                                             <button
-                                                                key={opt}
-                                                                onClick={() => handleSupportDetailChange(category, item, opt)}
-                                                                className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${val === opt
-                                                                    ? (opt === 'WF' ? 'bg-[#D32F2F] text-white shadow-sm' : (opt === 'Self' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-600'))
-                                                                    : 'text-gray-400 hover:text-gray-600'}`}
+                                                                onClick={() => handleSubItemLearnMore(category, item)}
+                                                                className="text-[9px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-0.5 hover:underline"
                                                             >
-                                                                {opt === 'WF' ? 'Wadhwani' : opt}
+                                                                AI HELP
                                                             </button>
-                                                        ))}
+                                                        </div>
+
+                                                        <div className="flex bg-gray-50 p-1 rounded-lg gap-1">
+                                                            {['WF', 'Self', 'NA'].map(opt => {
+                                                                const isSelected = val === opt;
+                                                                return (
+                                                                    <button
+                                                                        key={opt}
+                                                                        onClick={() => handleSupportDetailChange(category, item, opt)}
+                                                                        className={`
+                                                                            flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all duration-200
+                                                                            ${isSelected
+                                                                                ? 'bg-[#D32F2F] text-white shadow-sm'
+                                                                                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                                                                            }
+                                                                        `}
+                                                                    >
+                                                                        {opt === 'WF' ? 'WF' : opt}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
 
-                        <button onClick={handleNext} className="w-full mt-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
-                            Next
-                        </button>
+                        <div className="flex gap-4 mt-8">
+                            <div className="flex-1 flex justify-center gap-2 py-4">
+                                {[0, 1].map(i => (
+                                    <div key={i} className={`w-2 h-2 rounded-full transition-all ${supportStep === i ? 'bg-red-600 w-6' : 'bg-gray-200'}`}></div>
+                                ))}
+                            </div>
+                            <button onClick={handleSupportNext} className="w-40 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
+                                {supportStep === 1 ? 'Finish' : 'Next'}
+                            </button>
+                        </div>
                     </StepContainer>
                 )}
 
@@ -1109,8 +1146,7 @@ export default function ProfileWizard() {
                         </div>
                     </StepContainer>
                 )}
-
-            </div >
-        </div >
+            </div>
+        </div>
     );
 }
