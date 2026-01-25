@@ -513,7 +513,7 @@ export default function ProfileWizard() {
             }));
 
             alert(`Note: Database request failed (${error.message}). \n\nWe saved your profile locally so you can continue to the dashboard.`);
-            window.location.href = '/';
+            window.location.href = '/dashboard.html';
             setLoading(false);
             return;
         }
@@ -522,7 +522,7 @@ export default function ProfileWizard() {
         localStorage.removeItem('user_profile_data');
 
         // Redirect to Dashboard
-        window.location.href = '/';
+        window.location.href = '/dashboard.html';
         setLoading(false);
     };
 
@@ -1206,7 +1206,7 @@ export default function ProfileWizard() {
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Profitability</label>
                                         <div className={`text-sm font-bold px-2 py-0.5 rounded w-fit mt-1 ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
-                                                profile.profitability === 'BreakEven' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                                            profile.profitability === 'BreakEven' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
                                             }`}>
                                             {profile.profitability}
                                         </div>
