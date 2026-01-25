@@ -5,7 +5,7 @@ import {
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
     Mic, MessageSquare, Send, Info, X
 } from 'lucide-react';
-import { GoogleGenAI, SchemaType } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -180,16 +180,16 @@ export default function ProfileWizard() {
                     tools: [{ googleSearch: {} }],
                     responseMimeType: "application/json",
                     responseSchema: {
-                        type: SchemaType.OBJECT,
+                        type: Type.OBJECT,
                         properties: {
-                            name: { type: SchemaType.STRING },
-                            industry: { type: SchemaType.STRING },
-                            description: { type: SchemaType.STRING },
-                            promoters: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                            products: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                            customers: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-                            marketPosition: { type: SchemaType.STRING },
-                            employees: { type: SchemaType.STRING }
+                            name: { type: Type.STRING },
+                            industry: { type: Type.STRING },
+                            description: { type: Type.STRING },
+                            promoters: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            products: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            customers: { type: Type.ARRAY, items: { type: Type.STRING } },
+                            marketPosition: { type: Type.STRING },
+                            employees: { type: Type.STRING }
                         },
                         required: ["name", "industry", "description", "promoters", "products", "customers", "employees"]
                     }
