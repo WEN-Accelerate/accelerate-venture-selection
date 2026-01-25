@@ -141,14 +141,28 @@ export default function DashboardMain() {
                 return;
             }
 
-            // 1.5 Check if Consultant (Has assigned companies)
-            const { data: consultantData } = await supabase
+            // 1.5 Check if Authorized Consultant (Invitation Only)
+            const { data: isConsultant } = await supabase
+                .from('consultants')
+                .select('*')
+                .eq('user_id', uid)
+                .maybeSingle();
+
+            if (isConsultant) {
+                console.log("Invitation detected: User is an authorized consultant.");
+                setUserRole('consultant');
+                setLoading(false);
+                return;
+            }
+
+            // 1.6 Backup: Check if they ALREADY manage any companies (legacy/direct assignment)
+            const { data: managedCompanies } = await supabase
                 .from('profiles')
                 .select('id')
                 .eq('consultant_id', uid)
                 .limit(1);
 
-            if (consultantData && consultantData.length > 0) {
+            if (managedCompanies && managedCompanies.length > 0) {
                 setUserRole('consultant');
                 setLoading(false);
                 return;
@@ -351,24 +365,11 @@ export default function DashboardMain() {
                                 We couldn't find a business profile linked to <strong>{user.email || 'this account'}</strong>.
                             </p>
                             <a
-                                href="/index.html"
+                                href="/profile.html"
                                 className="block w-full py-3 bg-[#D32F2F] text-white font-bold rounded-xl hover:bg-red-800 transition-all mb-4"
                             >
                                 Create New Profile
                             </a>
-
-                            <div className="flex items-center gap-4 my-4">
-                                <div className="h-px bg-gray-200 flex-1"></div>
-                                <span className="text-xs font-bold text-gray-400 uppercase">OR</span>
-                                <div className="h-px bg-gray-200 flex-1"></div>
-                            </div>
-
-                            <button
-                                onClick={() => setUserRole('consultant')}
-                                className="w-full py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all mb-4 text-sm"
-                            >
-                                Consultant / Admin Access
-                            </button>
                         </>
                     )}
 

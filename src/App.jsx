@@ -296,13 +296,6 @@ const LoginScreen = ({ onLogin, loading }) => {
           >
             Continue as Guest <ArrowRight size={16} />
           </button>
-
-          <button
-            onClick={() => window.location.href = '/dashboard.html'}
-            className="w-full py-3 px-4 bg-white border border-gray-200 text-indigo-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all text-sm mt-4"
-          >
-            Consultant / Admin Access
-          </button>
         </div>
 
         <p className="mt-8 text-center text-[10px] text-gray-400 leading-tight">
@@ -455,13 +448,19 @@ export default function App() {
             .maybeSingle();
 
           // 2. Consultant check
-          const { data: consultantData } = await supabase
+          const { data: isConsultant } = await supabase
+            .from('consultants')
+            .select('user_id')
+            .eq('user_id', user.uid)
+            .maybeSingle();
+
+          const { data: managedCompanies } = await supabase
             .from('profiles')
             .select('id')
             .eq('consultant_id', user.uid)
             .limit(1);
 
-          if (consultantData && consultantData.length > 0) {
+          if (isConsultant || (managedCompanies && managedCompanies.length > 0)) {
             console.log("Consultant profile detected, redirecting to Dashboard...");
             window.location.href = '/dashboard.html';
             return;
