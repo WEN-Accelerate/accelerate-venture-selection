@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import {
@@ -209,7 +209,7 @@ export default function DashboardMain() {
     // --- RENDER HELPERS ---
 
     // Parse supportDetails into usable cards
-    const getCards = () => {
+    const cards = useMemo(() => {
         if (!profile || !profile.supportDetails) return [];
 
         return Object.entries(profile.supportDetails).map(([key, type]) => {
@@ -229,7 +229,7 @@ export default function DashboardMain() {
             if (filter === 'NA') return card.type === 'NA';
             return card.type === filter; // WF or Self
         });
-    };
+    }, [profile, filter]);
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -286,7 +286,7 @@ export default function DashboardMain() {
         );
     }
 
-    const cards = getCards();
+
 
     return (
         <div className="min-h-screen bg-[#F4F6F8] font-sans text-gray-900 selection:bg-red-100 selection:text-red-900">
@@ -309,20 +309,20 @@ export default function DashboardMain() {
                     <div className="bg-gray-100 p-1 rounded-xl flex gap-1 shadow-inner relative">
                         <button
                             onClick={() => setViewMode('context')}
-                            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
-                                ? 'bg-gray-900 text-white shadow-lg transform scale-105 ring-1 ring-gray-900/10'
-                                : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
-                                }`}
+                            className={`px - 6 py - 2 rounded - lg text - xs font - black uppercase tracking - widest transition - all duration - 300 flex items - center gap - 2 ${viewMode === 'context'
+                                    ? 'bg-gray-900 text-white shadow-lg transform scale-105 ring-1 ring-gray-900/10'
+                                    : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
+                                } `}
                         >
                             <Sparkles size={12} className={viewMode === 'context' ? 'text-yellow-400' : ''} />
                             Blueprint
                         </button>
                         <button
                             onClick={() => setViewMode('sprint')}
-                            className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
-                                ? 'bg-[#D32F2F] text-white shadow-lg transform scale-105 ring-1 ring-red-900/10'
-                                : 'text-gray-400 hover:text-red-900 hover:bg-red-50'
-                                }`}
+                            className={`px - 6 py - 2 rounded - lg text - xs font - black uppercase tracking - widest transition - all duration - 300 flex items - center gap - 2 ${viewMode === 'sprint'
+                                    ? 'bg-[#D32F2F] text-white shadow-lg transform scale-105 ring-1 ring-red-900/10'
+                                    : 'text-gray-400 hover:text-red-900 hover:bg-red-50'
+                                } `}
                         >
                             <Target size={12} />
                             Sprint
@@ -417,10 +417,10 @@ export default function DashboardMain() {
                                 </div>
                                 <div className="flex flex-col md:items-end">
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Profitability Status</label>
-                                    <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
-                                        profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
-                                            'bg-gray-100 text-gray-600'
-                                        }`}>
+                                    <span className={`px - 4 py - 1.5 rounded - full text - xs font - bold uppercase tracking - wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
+                                            profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
+                                                'bg-gray-100 text-gray-600'
+                                        } `}>
                                         {profile.profitability || 'Unknown'}
                                     </span>
                                 </div>
@@ -539,10 +539,10 @@ export default function DashboardMain() {
 const FilterButton = ({ label, active, onClick }) => (
     <button
         onClick={onClick}
-        className={`px-6 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-200 ${active
-            ? 'bg-[#D32F2F] text-white shadow-md transform scale-105'
-            : 'text-gray-500 hover:text-gray-900 hover:bg-white'
-            }`}
+        className={`px - 6 py - 2 rounded - full text - xs font - bold uppercase tracking - wider transition - all duration - 200 ${active
+                ? 'bg-[#D32F2F] text-white shadow-md transform scale-105'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-white'
+            } `}
     >
         {label === 'ALL' ? 'Everything' : label}
     </button>
@@ -560,7 +560,7 @@ const KaizenCard = ({ card, onClick }) => {
         >
             {/* Top Tag */}
             <div className="flex justify-between items-start mb-4">
-                <span className={`text-[10px] font-black tracking-widest uppercase ${accentColor}`}>
+                <span className={`text - [10px] font - black tracking - widest uppercase ${accentColor} `}>
                     {tag}
                 </span>
                 <div className="text-gray-300 group-hover:text-gray-500 transition-colors">
@@ -578,13 +578,13 @@ const KaizenCard = ({ card, onClick }) => {
             <div className="space-y-3 mb-8">
                 <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
                     <span className="font-bold text-gray-400 uppercase tracking-wider">Target Date</span>
-                    <span className={`font-bold ${card.dueDate ? 'text-gray-900' : 'text-gray-300'}`}>
+                    <span className={`font - bold ${card.dueDate ? 'text-gray-900' : 'text-gray-300'} `}>
                         {card.dueDate || 'PENDING'}
                     </span>
                 </div>
                 <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
                     <span className="font-bold text-gray-400 uppercase tracking-wider">Ownership</span>
-                    <span className={`font-bold ${card.owner ? 'text-gray-900' : 'text-gray-300'}`}>
+                    <span className={`font - bold ${card.owner ? 'text-gray-900' : 'text-gray-300'} `}>
                         {card.owner || 'UNASSIGNED'}
                     </span>
                 </div>

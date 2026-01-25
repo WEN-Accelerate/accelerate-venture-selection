@@ -109,7 +109,6 @@ export default function ProfileWizard() {
         growthLead: "",
         keyPersonnel: "",
         strategyDescription: "",
-        strategyDescription: "",
         strategyDimensions: { product: "", proposition: "", place: "", promotion: "" },
         supportDetails: {} // { "Product_MVP": "WF", "Product_Design": "Self" }
     });
