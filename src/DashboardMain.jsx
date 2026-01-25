@@ -4,7 +4,7 @@ import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
     BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
-    Trash2, Plus, Wand2, GraduationCap, Box, Play
+    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
@@ -315,7 +315,7 @@ export default function DashboardMain() {
                     <div className="bg-white border border-gray-200 p-1 rounded-full flex gap-1 shadow-sm">
                         <button
                             onClick={() => setViewMode('context')}
-                            className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
                                 ? 'bg-[#1e293b] text-white shadow-md'
                                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                                 }`}
@@ -325,13 +325,23 @@ export default function DashboardMain() {
                         </button>
                         <button
                             onClick={() => setViewMode('sprint')}
-                            className={`px-5 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
                                 ? 'bg-[#D32F2F] text-white shadow-md'
                                 : 'text-gray-500 hover:text-red-700 hover:bg-red-50'
                                 }`}
                         >
                             <Target size={12} />
                             Sprint
+                        </button>
+                        <button
+                            onClick={() => setViewMode('actions')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'actions'
+                                ? 'bg-indigo-600 text-white shadow-md'
+                                : 'text-gray-500 hover:text-indigo-700 hover:bg-indigo-50'
+                                }`}
+                        >
+                            <Briefcase size={12} />
+                            Actions
                         </button>
                     </div>
 
@@ -523,6 +533,13 @@ export default function DashboardMain() {
                     </div>
                 )}
 
+                {/* VIEW: ACTIONS (CONSOLIDATED RESOURCES) */}
+                {viewMode === 'actions' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <ActionCenterView cards={cards} />
+                    </div>
+                )}
+
             </main>
 
             {/* RIGHT SIDE PANEL (SLIDE OVERS) */}
@@ -569,14 +586,21 @@ const KaizenCard = ({ card, onClick }) => {
     const accentColor = isWF ? 'text-[#D32F2F]' : 'text-emerald-600';
     const tag = isWF ? 'WF MANAGEMENT' : card.type === 'Self' ? 'SELF MANAGEMENT' : 'NOT APPLICABLE';
 
+    // Compute Resource Needs
+    const actions = card.subActions || [];
+    const hasExpert = actions.some(a => a.expert);
+    const hasMasterclass = actions.some(a => a.masterclass);
+    const hasKP = actions.some(a => a.knowledgePack);
+    const planReady = actions.length > 0;
+
     return (
         <div
             onClick={onClick}
-            className="group bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden"
+            className="group bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer relative overflow-hidden flex flex-col h-full"
         >
             {/* Top Tag */}
             <div className="flex justify-between items-start mb-4">
-                <span className={`text - [10px] font - black tracking - widest uppercase ${accentColor} `}>
+                <span className={`text-[10px] font-black tracking-widest uppercase ${accentColor}`}>
                     {tag}
                 </span>
                 <div className="text-gray-300 group-hover:text-gray-500 transition-colors">
@@ -585,35 +609,159 @@ const KaizenCard = ({ card, onClick }) => {
             </div>
 
             {/* Title */}
-            <div className="mb-8">
-                <h3 className="text-2xl font-bold text-gray-900 leading-tight mb-1">{card.item}</h3>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{card.category} Support</p>
+            <div className="mb-6 flex-1">
+                <h3 className="text-2xl font-bold text-gray-900 leading-tight mb-2">{card.item}</h3>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{card.category} Pillar</p>
+
+                {/* Description Snippet if available */}
+                {card.description && (
+                    <p className="mt-3 text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                        {card.description}
+                    </p>
+                )}
             </div>
 
-            {/* Fields */}
-            <div className="space-y-3 mb-8">
-                <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
-                    <span className="font-bold text-gray-400 uppercase tracking-wider">Target Date</span>
-                    <span className={`font - bold ${card.dueDate ? 'text-gray-900' : 'text-gray-300'} `}>
-                        {card.dueDate || 'PENDING'}
-                    </span>
+            {/* Separator */}
+            <div className="h-px bg-gray-50 mb-4"></div>
+
+            {/* Plan Status & Resources */}
+            {planReady ? (
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Plan Resources</span>
+                        <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <Check size={10} /> Ready
+                        </span>
+                    </div>
+                    <div className="flex gap-2">
+                        {hasExpert && (
+                            <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg" title="Expert Consultation">
+                                <MessageCircle size={14} />
+                            </div>
+                        )}
+                        {hasMasterclass && (
+                            <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg" title="Masterclass">
+                                <GraduationCap size={14} />
+                            </div>
+                        )}
+                        {hasKP && (
+                            <div className="p-1.5 bg-amber-100 text-amber-600 rounded-lg" title="Knowledge Pack">
+                                <Box size={14} />
+                            </div>
+                        )}
+                        {!hasExpert && !hasMasterclass && !hasKP && (
+                            <span className="text-[10px] text-gray-400 italic">No external help needed</span>
+                        )}
+                    </div>
                 </div>
-                <div className="flex justify-between items-center text-xs border-b border-gray-50 pb-2">
-                    <span className="font-bold text-gray-400 uppercase tracking-wider">Ownership</span>
-                    <span className={`font - bold ${card.owner ? 'text-gray-900' : 'text-gray-300'} `}>
-                        {card.owner || 'UNASSIGNED'}
-                    </span>
+            ) : (
+                <div className="bg-red-50 rounded-xl p-3 border border-red-100 flex items-center justify-center gap-2 text-red-600 group-hover:bg-[#D32F2F] group-hover:text-white transition-colors">
+                    <Plus size={16} />
+                    <span className="text-xs font-bold uppercase tracking-wider">Create Action Plan</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ActionCenterView = ({ cards }) => {
+    // 1. Aggregate Data
+    const requests = useMemo(() => {
+        const expert = [];
+        const masterclass = [];
+        const knowledgePack = [];
+
+        cards.forEach(card => {
+            const actions = card.subActions || [];
+            actions.forEach(action => {
+                const item = {
+                    cardTitle: card.item,
+                    actionText: action.text,
+                    id: action.id
+                };
+                if (action.expert) expert.push(item);
+                if (action.masterclass) masterclass.push(item);
+                if (action.knowledgePack) knowledgePack.push(item);
+            });
+        });
+
+        return { expert, masterclass, knowledgePack };
+    }, [cards]);
+
+    const ResourceSection = ({ title, icon: Icon, items, colorClass, buttonColor }) => (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
+            <div className={`p-6 border-b border-gray-100 ${colorClass} bg-opacity-10 flex justify-between items-center`}>
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${colorClass} text-white`}>
+                        <Icon size={20} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-gray-900">{title}</h3>
+                        <p className="text-xs text-gray-500 font-semibold">{items.length} Pending Requests</p>
+                    </div>
                 </div>
             </div>
+            <div className="p-6 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar">
+                {items.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2 opacity-50">
+                        <Check size={32} />
+                        <p className="text-xs font-bold uppercase">All Clear</p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {items.map((item, i) => (
+                            <div key={i} className="flex gap-3 items-start text-sm border-b border-gray-50 last:border-0 pb-3 last:pb-0">
+                                <div className="mt-1 min-w-[4px] h-[4px] rounded-full bg-gray-300"></div>
+                                <div>
+                                    <div className="font-bold text-gray-800">{item.cardTitle}</div>
+                                    <div className="text-gray-500 text-xs">{item.actionText}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <div className="p-4 bg-gray-50 border-t border-gray-100">
+                <button
+                    disabled={items.length === 0}
+                    className={`w-full py-3 rounded-xl font-bold text-white text-sm shadow-md transition-all flex items-center justify-center gap-2 ${items.length === 0 ? 'bg-gray-300 cursor-not-allowed' : `${buttonColor} hover:opacity-90 hover:scale-[1.02]`}`}
+                    onClick={() => alert(`Request sent for ${items.length} items!`)}
+                >
+                    <Send size={16} /> Send Request
+                </button>
+            </div>
+        </div>
+    );
 
-            {/* Buttons */}
-            <div className="flex gap-3">
-                <div className="flex-1 py-3 rounded-xl border border-gray-200 text-center text-[10px] font-bold text-gray-600 uppercase tracking-widest hover:bg-gray-50 transition-colors">
-                    Masterclass
-                </div>
-                <div className="flex-1 py-3 rounded-xl border border-gray-200 text-center text-[10px] font-bold text-gray-600 uppercase tracking-widest hover:bg-gray-50 transition-colors">
-                    Talk Expert
-                </div>
+    return (
+        <div className="space-y-8">
+            <div className="text-center max-w-2xl mx-auto mb-10">
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">Resource Action Center</h2>
+                <p className="text-gray-500">Consolidated view of all support resources required for your expansion plan. Review and submit requests to the Wadhwani Foundation team.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <ResourceSection
+                    title="Expert Network"
+                    icon={MessageCircle}
+                    items={requests.expert}
+                    colorClass="bg-purple-500"
+                    buttonColor="bg-purple-600 shadow-purple-200"
+                />
+                <ResourceSection
+                    title="Masterclasses"
+                    icon={GraduationCap}
+                    items={requests.masterclass}
+                    colorClass="bg-blue-500"
+                    buttonColor="bg-blue-600 shadow-blue-200"
+                />
+                <ResourceSection
+                    title="Knowledge Packs"
+                    icon={Box}
+                    items={requests.knowledgePack}
+                    colorClass="bg-amber-500"
+                    buttonColor="bg-amber-600 shadow-amber-200"
+                />
             </div>
         </div>
     );
