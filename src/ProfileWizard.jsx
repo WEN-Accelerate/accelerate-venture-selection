@@ -98,6 +98,7 @@ const StepContainer = ({ title, children, showBack = true, onBack, aiContext }) 
 
 export default function ProfileWizard() {
     const [step, setStep] = useState(1);
+    const [supportStep, setSupportStep] = useState(0); // For Step 8 pagination
     const [loading, setLoading] = useState(false);
     const [aiContext, setAiContext] = useState("");
 
@@ -298,12 +299,12 @@ export default function ProfileWizard() {
 
     // --- STEP 8: SUPPORT DETAILS ---
     const SUPPORT_SUB_DOMAINS = {
-        'Product': ['MVP Definition', 'UX/UI Design', 'Tech Stack & Architecture', 'Roadmap Planning', 'User Testing'],
-        'Money': ['Valuation', 'Pitch Deck Creation', 'Investor Connect', 'Grant Application', 'Financial Modeling'],
-        'Placement': ['Channel Strategy', 'Partner Identification', 'Logistics Setup', 'Contract Negotiation', 'Warehousing'],
+        'Product': ['Market Fit', 'Feature Roadmap', 'Tech Stack', 'UI/UX Design', 'Quality QA'],
+        'Money': ['Fundraising', 'Valuation', 'Financial Modeling', 'Grant Strategy', 'Cash Flow'],
+        'Placement': ['Channel Entry', 'Logistics Setup', 'E-commerce Ops', 'Retail Partnerships', 'Supply Chain'],
         'Selling': ['Sales Scripting', 'Lead Generation', 'CRM Setup', 'Sales Training', 'Closing Strategies'],
-        'People': ['Org Structure Design', 'Hiring Key Roles', 'ESOP Planning', 'Culture Building', 'Performance Mgmt'],
-        'Process': ['Legal & Compliance', 'Accounting Setup', 'Agile Implementation', 'KPI Dashboards', 'Operations Manuals']
+        'People': ['Org Structure', 'Hiring Key Roles', 'ESOP Planning', 'Culture Building', 'Performance Mgmt'],
+        'Process': ['Legal / Compliance', 'Accounting Setup', 'Agile Implementation', 'KPI Dashboards', 'Ops Manuals']
     };
 
     const handleSupportDetailChange = (category, subItem, value) => {
@@ -316,10 +317,26 @@ export default function ProfileWizard() {
         }));
     };
 
-    const handleLearnMoreCategory = async (category) => {
-        const prompt = `Explain briefly what "Help in ${category}" entails for a generic startup in 2 sentences.`;
+    const handleSubItemLearnMore = async (category, subItem) => {
+        const prompt = `Explain what "${subItem}" involves in the context of "${category}" for a startup. Keep it to 1 sentence.`;
         const res = await callGemini(prompt);
-        alert(`${category} Help:\n\n${res}`);
+        alert(`${subItem} (${category}):\n\n${res}`);
+    };
+
+    const handleSupportNext = () => {
+        if (supportStep < 2) {
+            setSupportStep(prev => prev + 1);
+        } else {
+            handleNext();
+        }
+    };
+
+    const handleSupportBack = () => {
+        if (supportStep > 0) {
+            setSupportStep(prev => prev - 1);
+        } else {
+            handleBack();
+        }
     };
 
     const generateOnePager = async () => {
@@ -369,44 +386,50 @@ export default function ProfileWizard() {
         setLearnMoreLoading(true);
         setLearnMoreData(null);
 
-        // Analyze SPECIFICALLY the selected type
         const typeToAnalyze = selectedType || profile.ventureType;
 
         const prompt = `
-            Analyze the strategy: "${typeToAnalyze} Expansion" for:
-            Company: ${profile.companyName}
-            Industry: ${profile.industry}
-            Products: ${profile.products}
-            Customers: ${profile.customers}
-            Revenue: ${profile.revenue}
-
-            Task: Provide a strategic analysis for this SPECIFIC choice.
-            Return a JSON object:
-            {
-                "type": "QUICK WIN" or "LONG TERM BET",
-                "title": "Strategy Headline (e.g. Dominate Local Niche)",
-                "recommendation": "One paragraph strategic rationale.",
-                "execution_steps": ["Step 1", "Step 2", "Step 3"],
-                "impact": "Projected outcome..."
-            }
+            Context: Company ${profile.companyName}, Industry: ${profile.industry}.
+            Goal: ${typeToAnalyze} Expansion.
+            
+            Generate 6 distinct, hypothetical expansion scenarios (strategies) for this company.
+            Each should be different (e.g. M&A, Organic, Partnership, Digital-First, etc.).
+            
+            Return JSON array of objects:
+            [
+                {
+                    "title": "Strategy Name",
+                    "recommendation": "2 sentence description of this specific approach.",
+                    "type": "SCENARIO"
+                }
+            ]
             Return strictly JSON.
         `;
 
         try {
             const raw = await callGemini(prompt);
             const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            setLearnMoreData([JSON.parse(clean)]); // Wrap in array to keep map logic or refactor
+            const parsed = JSON.parse(clean);
+            setLearnMoreData(Array.isArray(parsed) ? parsed : [parsed]);
         } catch (e) {
             console.error("AI Error", e);
             setLearnMoreData([{
-                title: `${typeToAnalyze} EXECUTION PLAN`,
-                type: "RECOMMENDED PATH",
-                recommendation: `Focus on ${typeToAnalyze.toLowerCase()} markets to leverage your current strengths in ${profile.industry}.`,
-                execution_steps: ["Audit current capabilities", "Identify key pilot markets", "Align sales incentives"],
-                impact: "Steady revenue growth with manageable risk."
+                title: "Standard Expansion",
+                type: "SCENARIO",
+                recommendation: "Expand geographically using current product lines."
             }]);
         }
         setLearnMoreLoading(false);
+    };
+
+    const handleSelectStrategy = (strategyDescription) => {
+        setProfile(prev => ({
+            ...prev,
+            strategyDescription: strategyDescription
+        }));
+        setShowLearnMore(false);
+        // Optionally move to next step automatically or let user review
+        // setStep(5); 
     };
 
     const handleSuggestDimensions = async () => {
@@ -898,62 +921,20 @@ export default function ProfileWizard() {
                                 </div>
                             ) : (
                                 learnMoreData?.map((item, idx) => (
-                                    <div key={idx} className="group relative">
-                                        {/* Connecting Line for timeline effect */}
-                                        {idx !== learnMoreData.length - 1 && (
-                                            <div className="absolute left-6 top-16 bottom-[-32px] w-0.5 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
-                                        )}
-
-                                        <div className="relative bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5">
-                                            {/* Badge */}
-                                            <div className="flex items-center justify-between mb-4">
-                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${item.type.includes('WIN') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                                                    {item.type.includes('WIN') ? <CheckCircle size={12} /> : <Target size={12} />}
-                                                    {item.type}
-                                                </span>
-                                                <div className="text-gray-500 opacity-20">
-                                                    {item.title.includes('DOMESTIC') ? <Building2 size={24} /> : <Globe size={24} />}
-                                                </div>
-                                            </div>
-
-                                            {/* Title */}
-                                            <h4 className="text-xl font-bold text-white mb-3 tracking-tight">{item.title}</h4>
-
-                                            {/* Body */}
-                                            <p className="text-gray-300 text-sm leading-relaxed mb-6 border-l-2 border-gray-700 pl-4">
-                                                {item.recommendation}
-                                            </p>
-
-                                            {/* Execution Steps */}
-                                            {item.execution_steps && (
-                                                <div className="mb-6">
-                                                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Execution Strategy</p>
-                                                    <ul className="space-y-2">
-                                                        {item.execution_steps.map((step, sIdx) => (
-                                                            <li key={sIdx} className="text-sm text-gray-300 flex items-start gap-2">
-                                                                <div className="mt-1.5 w-1 h-1 rounded-full bg-yellow-400"></div>
-                                                                {step}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-
-                                            {/* Impact Box */}
-                                            <div className="bg-[#0f172a] rounded-xl p-4 flex gap-4 border border-gray-800">
-                                                <div className="mt-1 min-w-[20px]">
-                                                    <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                                                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Projected Impact</div>
-                                                    <div className="text-sm font-medium text-yellow-50 leading-tight">
-                                                        {item.impact}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    <div key={idx} className="bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5 mb-4">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h4 className="text-lg font-bold text-white">{item.title}</h4>
+                                            <span className="bg-white/10 text-white text-[10px] px-2 py-1 rounded-full uppercase tracking-wider">Scenario {idx + 1}</span>
                                         </div>
+                                        <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                                            {item.recommendation}
+                                        </p>
+                                        <button
+                                            onClick={() => handleSelectStrategy(item.recommendation)}
+                                            className="w-full text-center py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-lg text-sm transition-colors"
+                                        >
+                                            Select This Strategy
+                                        </button>
                                     </div>
                                 ))
                             )}
