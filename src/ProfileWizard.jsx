@@ -93,6 +93,7 @@ export default function ProfileWizard() {
     const [supportStep, setSupportStep] = useState(0); // For Step 8 pagination
     const [loading, setLoading] = useState(false);
     const [aiContext, setAiContext] = useState("");
+    const [consultantMode, setConsultantMode] = useState(false);
 
     const [profile, setProfile] = useState({
         companyName: "",
@@ -117,6 +118,15 @@ export default function ProfileWizard() {
     const [onePageSummary, setOnePageSummary] = useState("");
     const [onePageLoading, setOnePageLoading] = useState(false);
 
+    // Check for Consultant Mode
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'consultant_add') {
+            setConsultantMode(true);
+            console.log("Consultant Mode Active: Adding Client Profile");
+        }
+    }, []);
+
     // Chat State
     const [chatMessages, setChatMessages] = useState([
         { role: 'assistant', text: 'I can help refine your strategy. What are your main concerns about expansion?' }
@@ -128,22 +138,10 @@ export default function ProfileWizard() {
 
     // Auth State
     const [user, setUser] = useState(null);
-    const [consultantMode, setConsultantMode] = useState(false);
-    const [consultantContext, setConsultantContext] = useState(null);
 
     useEffect(() => {
         // Initialize Netlify Identity
         netlifyIdentity.init();
-
-        // Check if in consultant mode
-        const isConsultantMode = sessionStorage.getItem('consultant_mode') === 'true';
-        const consultantId = sessionStorage.getItem('consultant_id');
-        const consultantUserId = sessionStorage.getItem('consultant_user_id');
-
-        if (isConsultantMode && consultantId) {
-            setConsultantMode(true);
-            setConsultantContext({ consultantId, consultantUserId });
-        }
 
         const currentUser = netlifyIdentity.currentUser();
         if (currentUser) {
@@ -152,8 +150,8 @@ export default function ProfileWizard() {
                 email: currentUser.email,
                 isAnonymous: false
             });
-        } else if (!isConsultantMode) {
-            // Guest Logic (only if not in consultant mode)
+        } else {
+            // Guest Logic
             const guestId = localStorage.getItem('accelerate_guest_id') || `guest_${Math.random().toString(36).substr(2, 9)}`;
             localStorage.setItem('accelerate_guest_id', guestId);
             setUser({ uid: guestId, isAnonymous: true });
@@ -518,87 +516,83 @@ export default function ProfileWizard() {
     };
 
     // --- FINAL SAVE ---
+    // --- FINAL SAVE ---
     const handleSave = async () => {
-        // In consultant mode, create a new company user ID
-        let targetUserId = user?.uid;
-
-        if (consultantMode) {
-            // Generate a unique ID for the new company
-            targetUserId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            console.log("Consultant Mode: Creating company with ID:", targetUserId);
-        } else if (!user || !user.uid) {
-            alert("Authentication missing. Please reload or sign in.");
-            return;
+        if (!user || user.isAnonymous && !consultantMode) {
+            // Allow anonymous unless consultant mode?
+            // Actually consultant mode MUST have a logged in user (the consultant)
+            if (consultantMode && (!user || user.isAnonymous)) {
+                alert("Consultant session invalid. Please log in again.");
+                return;
+            }
         }
 
         setLoading(true);
+
+        // Determine Target User ID
+        // If normal user: use their uid.
+        // If consultant mode: generate NEW uuid for the client.
+        let targetUserId = user.uid;
+        if (consultantMode) {
+            targetUserId = crypto.randomUUID();
+            console.log("Consultant Mode: Generated Client ID:", targetUserId);
+        }
+
         console.log("Saving to Supabase for User:", targetUserId);
 
-        // Save the company profile
-        const { error: profileError } = await supabase
+        const { error } = await supabase
             .from('profiles')
             .upsert([
                 {
                     user_id: targetUserId,
                     company_name: profile.companyName,
-                    role: 'sme', // Always SME for companies
                     details: profile,
                     updated_at: new Date()
                 }
             ], { onConflict: 'user_id' });
 
-        if (profileError) {
-            console.error("Supabase Error:", profileError);
-
+        if (error) {
+            console.error("Supabase Error:", error);
             if (!consultantMode) {
-                // FALLBACK: Save to LocalStorage for non-consultant mode
+                // FALLBACK: Save to LocalStorage so the user can still proceed!
                 console.log("Falling back to local storage...");
                 localStorage.setItem('user_profile_data', JSON.stringify({
                     companyName: profile.companyName,
                     details: profile,
                     updated_at: new Date()
                 }));
-                alert(`Note: Database request failed (${profileError.message}). \n\nWe saved your profile locally so you can continue to the dashboard.`);
+                alert(`Note: Database request failed (${error.message}). \n\nWe saved your profile locally.`);
                 window.location.href = '/dashboard.html';
             } else {
-                alert(`Failed to create company: ${profileError.message}`);
+                alert(`Failed to save client profile: ${error.message}`);
             }
-
             setLoading(false);
             return;
         }
 
-        // If in consultant mode, create the assignment
-        if (consultantMode && consultantContext) {
-            const { error: assignmentError } = await supabase
-                .from('company_assignments')
-                .insert([
-                    {
-                        consultant_id: consultantContext.consultantId,
-                        company_user_id: targetUserId,
-                        assigned_by: consultantContext.consultantUserId,
-                        notes: `Created via wizard on ${new Date().toLocaleDateString()}`
-                    }
-                ]);
+        // Check if Consultant Mode -> Link Client
+        if (consultantMode) {
+            const { error: linkError } = await supabase
+                .from('consultant_clients')
+                .insert([{
+                    consultant_email: user.email,
+                    client_profile_id: targetUserId
+                }]);
 
-            if (assignmentError) {
-                console.error("Assignment Error:", assignmentError);
-                alert(`Company created but assignment failed: ${assignmentError.message}`);
+            if (linkError) {
+                console.error("Failed to link client to consultant", linkError);
+                alert("Profile saved but linking failed. Please contact admin.");
+            } else {
+                console.log("Client linked successfully");
             }
 
-            // Clear consultant session data
-            sessionStorage.removeItem('consultant_mode');
-            sessionStorage.removeItem('consultant_id');
-            sessionStorage.removeItem('consultant_user_id');
-
-            // Redirect back to consultant dashboard
+            // Redirect to Consultant Dashboard
             window.location.href = '/consultant.html';
         } else {
-            // Regular user flow
+            // Normal User Redirect
             localStorage.removeItem('user_profile_data');
             window.location.href = '/dashboard.html';
         }
-
         setLoading(false);
     };
 

@@ -301,6 +301,11 @@ const LoginScreen = ({ onLogin, loading }) => {
         <p className="mt-8 text-center text-[10px] text-gray-400 leading-tight">
           By continuing, you agree to the Terms of Service and Privacy Policy of the Wadhwani Foundation.
         </p>
+        <div className="mt-4 text-center">
+          <a href="/consultant.html" className="text-[10px] text-gray-300 hover:text-gray-500 font-semibold uppercase tracking-wider">
+            Advisor Login
+          </a>
+        </div>
       </div>
     </div>
   );
