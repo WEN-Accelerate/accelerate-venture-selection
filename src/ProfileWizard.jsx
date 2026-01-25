@@ -597,66 +597,109 @@ export default function ProfileWizard() {
                         {/* Learn More Modal (Premium Dark UI) */}
                         {/* Learn More Modal (Premium Dark UI) */}
                         {/* Learn More Sidebar (Right Side Slide-in) */}
+                        {/* Learn More: Contextual Split-Panel Drawer */}
                         {showLearnMore && (
-                            <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
-                                {/* Clicking outside closes it */}
-                                <div className="absolute inset-0" onClick={() => setShowLearnMore(false)}></div>
+                            <>
+                                {/* Backdrop for focus, but lighter to maintain context feel */}
+                                <div
+                                    className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity duration-300"
+                                    onClick={() => setShowLearnMore(false)}
+                                ></div>
 
-                                <div className="relative w-full md:w-2/3 lg:w-1/2 h-full bg-[#1a202c] shadow-2xl border-l border-gray-700 p-8 overflow-y-auto animate-in slide-in-from-right duration-300">
-                                    <button onClick={() => setShowLearnMore(false)} className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors bg-white/10 p-2 rounded-full">
-                                        <X size={20} />
-                                    </button>
+                                {/* The Right-Side Panel */}
+                                <div className="fixed top-0 right-0 h-full w-full md:w-[48%] lg:w-[40%] bg-[#0f172a] shadow-2xl z-50 border-l border-gray-800 overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col">
 
-                                    <h3 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                                        <Sparkles className="text-yellow-400" size={28} />
-                                        Strategic Intelligence
-                                    </h3>
-                                    <p className="text-gray-400 mb-8 border-b border-gray-700 pb-6">
-                                        Tailored expansion analysis for <span className="text-white font-semibold">{profile.companyName}</span>
-                                    </p>
+                                    {/* Header Section */}
+                                    <div className="sticky top-0 bg-[#0f172a]/95 backdrop-blur z-10 px-8 py-6 border-b border-gray-800 flex justify-between items-start">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-2 text-yellow-500 font-bold text-xs tracking-widest uppercase">
+                                                <Sparkles size={14} /> Strategic Intelligence
+                                            </div>
+                                            <h3 className="text-2xl font-bold text-white leading-tight">
+                                                Contextual Analysis
+                                            </h3>
+                                            <p className="text-gray-400 text-sm mt-1">
+                                                For <span className="text-white font-medium">{profile.companyName}</span>
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowLearnMore(false)}
+                                            className="text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
+                                            title="Close Panel"
+                                        >
+                                            <X size={24} />
+                                        </button>
+                                    </div>
 
-                                    <div className="space-y-8 pb-20">
+                                    {/* Scrollable Content */}
+                                    <div className="p-8 space-y-8 flex-1">
                                         {learnMoreLoading ? (
-                                            <div className="flex flex-col items-center justify-center py-20">
-                                                <Loader2 className="w-12 h-12 text-yellow-400 animate-spin mb-4" />
-                                                <p className="text-gray-400 text-lg">Analyzing market context...</p>
+                                            <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 bg-yellow-500 blur-xl opacity-20 animate-pulse"></div>
+                                                    <Loader2 className="relative w-16 h-16 text-yellow-500 animate-spin" />
+                                                </div>
+                                                <p className="mt-8 text-gray-400 font-medium text-lg animate-pulse">
+                                                    Synthesizing market data...
+                                                </p>
+                                                <p className="text-gray-600 text-sm mt-2">Comparing growth vectors for your industry</p>
                                             </div>
                                         ) : (
                                             learnMoreData?.map((item, idx) => (
-                                                <div key={idx} className="bg-[#2d3748] rounded-xl p-8 border-l-4 border-yellow-500 shadow-xl relative overflow-hidden group hover:bg-[#323d4e] transition-colors">
-                                                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                                        {item.title.includes('DOMESTIC') ? <Building2 size={100} className="text-white" /> : <Globe size={100} className="text-white" />}
-                                                    </div>
+                                                <div key={idx} className="group relative">
+                                                    {/* Connecting Line for timeline effect */}
+                                                    {idx !== learnMoreData.length - 1 && (
+                                                        <div className="absolute left-6 top-16 bottom-[-32px] w-0.5 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
+                                                    )}
 
-                                                    <div className="flex items-center gap-3 mb-4">
-                                                        <span className={`text-xs font-bold px-3 py-1 rounded-full ${item.type.includes('WIN') ? 'bg-green-900 text-green-300' : 'bg-purple-900 text-purple-300'} tracking-wider uppercase`}>
-                                                            {item.type}
-                                                        </span>
-                                                    </div>
+                                                    <div className="relative bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5">
+                                                        {/* Badge */}
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${item.type.includes('WIN') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
+                                                                {item.type.includes('WIN') ? <CheckCircle size={12} /> : <Target size={12} />}
+                                                                {item.type}
+                                                            </span>
+                                                            <div className="text-gray-500 opacity-20">
+                                                                {item.title.includes('DOMESTIC') ? <Building2 size={24} /> : <Globe size={24} />}
+                                                            </div>
+                                                        </div>
 
-                                                    <h4 className="text-2xl font-bold text-white mb-4">{item.title}</h4>
+                                                        {/* Title */}
+                                                        <h4 className="text-xl font-bold text-white mb-3 tracking-tight">{item.title}</h4>
 
-                                                    <div className="prose prose-invert prose-sm mb-6">
-                                                        <p className="text-gray-300 leading-relaxed text-base">
+                                                        {/* Body */}
+                                                        <p className="text-gray-300 text-sm leading-relaxed mb-6 border-l-2 border-gray-700 pl-4">
                                                             {item.recommendation}
                                                         </p>
-                                                    </div>
 
-                                                    <div className="bg-black/20 p-4 rounded-lg flex items-start gap-4 border border-white/5">
-                                                        <div className="mt-1 bg-yellow-500/20 p-2 rounded text-yellow-500">
-                                                            <Target size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[10px] font-bold text-yellow-500 uppercase mb-1 tracking-widest">ESTIMATED IMPACT</p>
-                                                            <p className="text-sm text-yellow-50 font-medium leading-relaxed">{item.impact}</p>
+                                                        {/* Impact Box */}
+                                                        <div className="bg-[#0f172a] rounded-xl p-4 flex gap-4 border border-gray-800">
+                                                            <div className="mt-1 min-w-[20px]">
+                                                                <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                                                                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Projected Impact</div>
+                                                                <div className="text-sm font-medium text-yellow-50 leading-tight">
+                                                                    {item.impact}
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             ))
                                         )}
                                     </div>
+
+                                    {/* Footer */}
+                                    <div className="p-6 border-t border-gray-800 bg-[#0f172a] text-center">
+                                        <p className="text-xs text-gray-500">
+                                            AI inputs based on {profile.industry} trends & public market data.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
+                            </>
                         )}
                     </StepContainer>
                 )}
