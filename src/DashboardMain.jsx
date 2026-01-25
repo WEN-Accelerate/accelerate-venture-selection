@@ -510,7 +510,6 @@ export default function DashboardMain() {
                                 <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
                                 <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
                                 <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
-                                <FilterButton label="NA" active={filter === 'NA'} onClick={() => setFilter('NA')} />
                             </div>
                         </div>
 
@@ -536,6 +535,15 @@ export default function DashboardMain() {
                 {/* VIEW: ACTIONS (CONSOLIDATED RESOURCES) */}
                 {viewMode === 'actions' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* ACTIONS FILTERS */}
+                        <div className="flex justify-center mb-10">
+                            <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-200">
+                                <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
+                                <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
+                                <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
+                            </div>
+                        </div>
+
                         <ActionCenterView cards={cards} />
                     </div>
                 )}
