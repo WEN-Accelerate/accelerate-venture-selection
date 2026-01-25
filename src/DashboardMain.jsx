@@ -100,11 +100,44 @@ export default function DashboardMain() {
 
     const fetchProfile = async (uid) => {
         try {
-            const { data, error } = await supabase
+            // 1. Try finding profile for THIS user
+            let { data, error } = await supabase
                 .from('profiles')
                 .select('details')
                 .eq('user_id', uid)
                 .maybeSingle();
+
+            // 2. If not found, check if we have a Guest ID to adopt (Migration Logic)
+            if ((!data || !data.details) && localStorage.getItem('accelerate_guest_id')) {
+                const guestId = localStorage.getItem('accelerate_guest_id');
+                console.log("Checking for orphan guest profile:", guestId);
+
+                const guestResult = await supabase
+                    .from('profiles')
+                    .select('*') // Get full row
+                    .eq('user_id', guestId)
+                    .maybeSingle();
+
+                if (guestResult.data) {
+                    console.log("Found guest profile. Migrating ownership to:", uid);
+
+                    // UPDATE the profile to belong to the new user
+                    const { error: updateError } = await supabase
+                        .from('profiles')
+                        .update({ user_id: uid })
+                        .eq('user_id', guestId);
+
+                    if (!updateError) {
+                        console.log("Migration successful!");
+                        data = { details: guestResult.data.details };
+
+                        // Clean up guest ID
+                        localStorage.removeItem('accelerate_guest_id');
+                    } else {
+                        console.error("Migration failed:", updateError);
+                    }
+                }
+            }
 
             if (data && data.details) {
                 setProfile(data.details);
