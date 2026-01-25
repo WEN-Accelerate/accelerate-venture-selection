@@ -492,19 +492,31 @@ export default function ProfileWizard() {
             return;
         }
 
-        setLoading(true);
-        console.log("Saving to Supabase for User:", user.uid);
+        const consultantMode = sessionStorage.getItem('accelerate_consultant_mode') === 'true';
+        const consultantId = sessionStorage.getItem('accelerate_consultant_id');
 
-        const { error } = await supabase
-            .from('profiles')
-            .upsert([
-                {
-                    user_id: user.uid,
-                    company_name: profile.companyName,
-                    details: profile,
-                    updated_at: new Date()
-                }
-            ], { onConflict: 'user_id' });
+        setLoading(true);
+        console.log("Saving to Supabase. Mode:", consultantMode ? 'Consultant' : 'SME');
+
+        const payload = {
+            company_name: profile.companyName,
+            details: profile,
+            updated_at: new Date()
+        };
+
+        let dbOp;
+        if (consultantMode && consultantId) {
+            // Consultant is adding a client
+            payload.consultant_id = consultantId;
+            payload.user_id = null; // SME not yet assigned
+            dbOp = supabase.from('profiles').insert([payload]);
+        } else {
+            // Regular SME onboarding
+            payload.user_id = user.uid;
+            dbOp = supabase.from('profiles').upsert([payload], { onConflict: 'user_id' });
+        }
+
+        const { error } = await dbOp;
 
         if (error) {
             console.error("Supabase Error:", error);
@@ -524,6 +536,8 @@ export default function ProfileWizard() {
 
         // on successful save, clear local fallback to avoid confusion
         localStorage.removeItem('user_profile_data');
+        sessionStorage.removeItem('accelerate_consultant_mode');
+        sessionStorage.removeItem('accelerate_consultant_id');
 
         // Redirect to Dashboard
         window.location.href = '/dashboard.html';

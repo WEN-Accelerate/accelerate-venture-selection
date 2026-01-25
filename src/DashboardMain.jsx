@@ -7,6 +7,7 @@ import {
     Trash2, Plus, Wand2, GraduationCap, Box, Play, Send
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import ConsultantDashboard from './ConsultantDashboard';
 
 // --- CONFIG ---
 
@@ -21,6 +22,8 @@ export default function DashboardMain() {
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
     const [selectedCard, setSelectedCard] = useState(null); // For Modal
+    const [userRole, setUserRole] = useState(null); // 'sme' | 'consultant'
+    const [activeProfileId, setActiveProfileId] = useState(null); // For multi-tenancy
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
@@ -102,12 +105,54 @@ export default function DashboardMain() {
 
     const fetchProfile = async (uid) => {
         try {
+            // 0. Check for "Acting As" context (Consultant Mode)
+            const params = new URLSearchParams(window.location.search);
+            const companyId = params.get('companyId');
+
+            if (companyId) {
+                console.log("Loading Profile for Company ID:", companyId);
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', companyId)
+                    .maybeSingle();
+
+                if (data) {
+                    setProfile(data.details);
+                    setActiveProfileId(data.id);
+                    setUserRole('sme');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             // 1. Try finding profile for THIS user
             let { data, error } = await supabase
                 .from('profiles')
-                .select('details')
+                .select('*')
                 .eq('user_id', uid)
                 .maybeSingle();
+
+            if (data && data.details) {
+                setProfile(data.details);
+                setActiveProfileId(data.id);
+                setUserRole('sme');
+                setLoading(false);
+                return;
+            }
+
+            // 1.5 Check if Consultant (Has assigned companies)
+            const { data: consultantData } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('consultant_id', uid)
+                .limit(1);
+
+            if (consultantData && consultantData.length > 0) {
+                setUserRole('consultant');
+                setLoading(false);
+                return;
+            }
 
             // 2. If not found, check if we have a Guest ID to adopt (Migration Logic)
             if ((!data || !data.details) && localStorage.getItem('accelerate_guest_id')) {
@@ -195,25 +240,38 @@ export default function DashboardMain() {
         const newProfile = { ...profile, supportMetadata: newMetadata };
         setProfile(newProfile); // Optimistic update
 
+        // Calculate Progress Metrics
+        const totalCards = profile.supportDetails ? Object.keys(profile.supportDetails).length : 0;
+        const plannedCards = Object.values(newMetadata).filter(m => m.subActions && m.subActions.length > 0).length;
+        const progress = totalCards > 0 ? Math.round((plannedCards / totalCards) * 100) : 0;
+
+        const stage = progress > 60 ? 'Execution' : progress > 0 ? 'Planning' : 'Researching';
+
         // Save to DB
         if (user && !user.isAnonymous) {
-            console.log("Saving profile to Supabase...", user.uid);
+            console.log("Saving profile to Supabase...", activeProfileId || user.uid);
 
             const payload = {
-                user_id: user.uid,
                 details: newProfile,
                 company_name: profile.companyName || 'My Company',
+                strategy_progress: progress,
+                venture_stage: stage,
                 updated_at: new Date()
             };
 
+            if (activeProfileId) {
+                payload.id = activeProfileId;
+            } else {
+                payload.user_id = user.uid;
+            }
+
             const { data, error } = await supabase
                 .from('profiles')
-                .upsert([payload], { onConflict: 'user_id' })
+                .upsert([payload], { onConflict: activeProfileId ? 'id' : 'user_id' })
                 .select();
 
             if (error) {
                 console.error("Supabase Save Error:", error);
-                console.error("Payload sent:", payload);
                 alert(`Failed to save: ${error.message || 'Unknown DB Error'}`);
             } else {
                 console.log("Supabase Save Success.", data);
@@ -298,6 +356,19 @@ export default function DashboardMain() {
                             >
                                 Create New Profile
                             </a>
+
+                            <div className="flex items-center gap-4 my-4">
+                                <div className="h-px bg-gray-200 flex-1"></div>
+                                <span className="text-xs font-bold text-gray-400 uppercase">OR</span>
+                                <div className="h-px bg-gray-200 flex-1"></div>
+                            </div>
+
+                            <button
+                                onClick={() => setUserRole('consultant')}
+                                className="w-full py-3 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all mb-4 text-sm"
+                            >
+                                Consultant / Admin Access
+                            </button>
                         </>
                     )}
 
@@ -305,12 +376,18 @@ export default function DashboardMain() {
                         Return to Home
                     </a>
                 </div>
-            </div>
+            </div >
         );
     }
 
 
 
+    // If Consultant Role Detected
+    if (userRole === 'consultant') {
+        return <ConsultantDashboard user={user} onLogout={handleLogout} />;
+    }
+
+    // Default SME Dashboard
     return (
         <div className="min-h-screen bg-[#F4F6F8] font-sans text-gray-900 selection:bg-red-100 selection:text-red-900">
             {/* HEADER */}
@@ -363,6 +440,14 @@ export default function DashboardMain() {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        {new URLSearchParams(window.location.search).get('companyId') && (
+                            <button
+                                onClick={() => window.location.href = '/dashboard.html'}
+                                className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                            >
+                                Back to Client List
+                            </button>
+                        )}
                         <div className="text-right hidden md:block">
                             <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
                             <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
