@@ -25,7 +25,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // WADHWANI BRAND ASSETS
 // WADHWANI BRAND ASSETS
-const WADHWANI_LOGO_URL = "https://avatars.githubusercontent.com/u/16666031?s=280&v=4"; // Reliable fallback source
+const WADHWANI_LOGO_URL = "https://cdn.wadhwanifoundation.org/wp-content/uploads/2023/06/WF-Logo.svg";
+// Fallback if the above fails (handled by img onerror in production, but here we stick to the official one requested or a known working one)
+
 
 const BRAND_COLORS = {
     red: 'bg-[#D32F2F]',
@@ -595,130 +597,128 @@ export default function ProfileWizard() {
 
                         <div className="mt-4 flex justify-center">
                             <button
-                                onClick={handleLearnMore}
+                                onClick={() => handleLearnMore(null)}
                                 className="text-sm font-semibold text-indigo-600 flex items-center gap-2 hover:underline"
                             >
                                 <Info size={16} /> Learn more about these options
                             </button>
                         </div>
+                    </StepContainer>
+                )}
 
-                        {/* Learn More Modal (Premium Dark UI) */}
-                        {/* Learn More Modal (Premium Dark UI) */}
-                        {/* Learn More Sidebar (Right Side Slide-in) */}
-                        {/* Learn More: Contextual Split-Panel Drawer */}
-                        {showLearnMore && (
-                            <div className="fixed top-0 right-0 h-full w-full md:w-[45%] bg-[#0f172a] shadow-2xl z-50 border-l border-gray-800 animate-in slide-in-from-right duration-500 flex flex-col">
 
-                                {/* Header Section */}
-                                <div className="sticky top-0 bg-[#0f172a]/95 backdrop-blur z-10 px-8 py-6 border-b border-gray-800 flex justify-between items-start">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-2 text-yellow-500 font-bold text-xs tracking-widest uppercase">
-                                            <Sparkles size={14} /> Strategic Intelligence
-                                        </div>
-                                        <h3 className="text-2xl font-bold text-white leading-tight">
-                                            Contextual Analysis
-                                        </h3>
-                                        <p className="text-gray-400 text-sm mt-1">
-                                            For <span className="text-white font-medium">{profile.companyName}</span>
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowLearnMore(false)}
-                                        className="absolute top-6 right-6 text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
-                                        title="Close Panel"
-                                    >
-                                        <X size={24} />
-                                    </button>
+
+                {/* --- GLOBAL AI PANEL (Rendered outside StepContainer for stacking context) --- */}
+                {showLearnMore && (
+                    <div className="fixed top-0 right-0 h-full w-full md:w-[45%] bg-[#0f172a] shadow-2xl z-[100] border-l border-gray-800 animate-in slide-in-from-right duration-500 flex flex-col">
+
+                        {/* Header Section */}
+                        <div className="sticky top-0 bg-[#0f172a]/95 backdrop-blur z-10 px-8 py-6 border-b border-gray-800 flex justify-between items-start">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2 text-yellow-500 font-bold text-xs tracking-widest uppercase">
+                                    <Sparkles size={14} /> Strategic Intelligence
                                 </div>
+                                <h3 className="text-2xl font-bold text-white leading-tight">
+                                    Contextual Analysis
+                                </h3>
+                                <p className="text-gray-400 text-sm mt-1">
+                                    For <span className="text-white font-medium">{profile.companyName}</span>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowLearnMore(false)}
+                                className="absolute top-6 right-6 text-gray-400 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all"
+                                title="Close Panel"
+                            >
+                                <X size={24} />
+                            </button>
+                        </div>
 
-                                {/* Scrollable Content */}
-                                <div className="p-8 space-y-8 flex-1">
-                                    {learnMoreLoading ? (
-                                        <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
-                                            <div className="relative">
-                                                <div className="absolute inset-0 bg-yellow-500 blur-xl opacity-20 animate-pulse"></div>
-                                                <Loader2 className="relative w-16 h-16 text-yellow-500 animate-spin" />
+                        {/* Scrollable Content */}
+                        <div className="p-8 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
+                            {learnMoreLoading ? (
+                                <div className="h-full flex flex-col items-center justify-center min-h-[400px]">
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-yellow-500 blur-xl opacity-20 animate-pulse"></div>
+                                        <Loader2 className="relative w-16 h-16 text-yellow-500 animate-spin" />
+                                    </div>
+                                    <p className="mt-8 text-gray-400 font-medium text-lg animate-pulse">
+                                        Synthesizing market data...
+                                    </p>
+                                    <p className="text-gray-600 text-sm mt-2">Comparing growth vectors for your industry</p>
+                                </div>
+                            ) : (
+                                learnMoreData?.map((item, idx) => (
+                                    <div key={idx} className="group relative">
+                                        {/* Connecting Line for timeline effect */}
+                                        {idx !== learnMoreData.length - 1 && (
+                                            <div className="absolute left-6 top-16 bottom-[-32px] w-0.5 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
+                                        )}
+
+                                        <div className="relative bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5">
+                                            {/* Badge */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${item.type.includes('WIN') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
+                                                    {item.type.includes('WIN') ? <CheckCircle size={12} /> : <Target size={12} />}
+                                                    {item.type}
+                                                </span>
+                                                <div className="text-gray-500 opacity-20">
+                                                    {item.title.includes('DOMESTIC') ? <Building2 size={24} /> : <Globe size={24} />}
+                                                </div>
                                             </div>
-                                            <p className="mt-8 text-gray-400 font-medium text-lg animate-pulse">
-                                                Synthesizing market data...
+
+                                            {/* Title */}
+                                            <h4 className="text-xl font-bold text-white mb-3 tracking-tight">{item.title}</h4>
+
+                                            {/* Body */}
+                                            <p className="text-gray-300 text-sm leading-relaxed mb-6 border-l-2 border-gray-700 pl-4">
+                                                {item.recommendation}
                                             </p>
-                                            <p className="text-gray-600 text-sm mt-2">Comparing growth vectors for your industry</p>
-                                        </div>
-                                    ) : (
-                                        learnMoreData?.map((item, idx) => (
-                                            <div key={idx} className="group relative">
-                                                {/* Connecting Line for timeline effect */}
-                                                {idx !== learnMoreData.length - 1 && (
-                                                    <div className="absolute left-6 top-16 bottom-[-32px] w-0.5 bg-gray-800 group-hover:bg-gray-700 transition-colors"></div>
-                                                )}
 
-                                                <div className="relative bg-[#1e293b] rounded-2xl p-6 border border-gray-700 hover:border-yellow-500/50 transition-all shadow-lg hover:shadow-yellow-500/5">
-                                                    {/* Badge */}
-                                                    <div className="flex items-center justify-between mb-4">
-                                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase ${item.type.includes('WIN') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                                                            {item.type.includes('WIN') ? <CheckCircle size={12} /> : <Target size={12} />}
-                                                            {item.type}
-                                                        </span>
-                                                        <div className="text-gray-500 opacity-20">
-                                                            {item.title.includes('DOMESTIC') ? <Building2 size={24} /> : <Globe size={24} />}
-                                                        </div>
+                                            {/* Execution Steps */}
+                                            {item.execution_steps && (
+                                                <div className="mb-6">
+                                                    <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Execution Strategy</p>
+                                                    <ul className="space-y-2">
+                                                        {item.execution_steps.map((step, sIdx) => (
+                                                            <li key={sIdx} className="text-sm text-gray-300 flex items-start gap-2">
+                                                                <div className="mt-1.5 w-1 h-1 rounded-full bg-yellow-400"></div>
+                                                                {step}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {/* Impact Box */}
+                                            <div className="bg-[#0f172a] rounded-xl p-4 flex gap-4 border border-gray-800">
+                                                <div className="mt-1 min-w-[20px]">
+                                                    <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                                                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
                                                     </div>
-
-                                                    {/* Title */}
-                                                    <h4 className="text-xl font-bold text-white mb-3 tracking-tight">{item.title}</h4>
-
-                                                    {/* Body */}
-                                                    <p className="text-gray-300 text-sm leading-relaxed mb-6 border-l-2 border-gray-700 pl-4">
-                                                        {item.recommendation}
-                                                    </p>
-
-                                                    {/* Execution Steps */}
-                                                    {item.execution_steps && (
-                                                        <div className="mb-6">
-                                                            <p className="text-[10px] font-bold text-gray-500 uppercase mb-2">Execution Strategy</p>
-                                                            <ul className="space-y-2">
-                                                                {item.execution_steps.map((step, sIdx) => (
-                                                                    <li key={sIdx} className="text-sm text-gray-300 flex items-start gap-2">
-                                                                        <div className="mt-1.5 w-1 h-1 rounded-full bg-yellow-400"></div>
-                                                                        {step}
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Impact Box */}
-                                                    <div className="bg-[#0f172a] rounded-xl p-4 flex gap-4 border border-gray-800">
-                                                        <div className="mt-1 min-w-[20px]">
-                                                            <div className="w-5 h-5 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                                                                <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Projected Impact</div>
-                                                            <div className="text-sm font-medium text-yellow-50 leading-tight">
-                                                                {item.impact}
-                                                            </div>
-                                                        </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-bold text-gray-500 uppercase mb-1">Projected Impact</div>
+                                                    <div className="text-sm font-medium text-yellow-50 leading-tight">
+                                                        {item.impact}
                                                     </div>
                                                 </div>
                                             </div>
-                                        ))
-                                    )}
-                                </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
 
+                        {/* Footer */}
+                        <div className="p-6 border-t border-gray-800 bg-[#0f172a] text-center">
+                            <p className="text-xs text-gray-500">
+                                AI inputs based on {profile.industry} trends & public market data.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
-                                {/* Footer */}
-                                <div className="p-6 border-t border-gray-800 bg-[#0f172a] text-center">
-                                    <p className="text-xs text-gray-500">
-                                        AI inputs based on {profile.industry} trends & public market data.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-                    </StepContainer>
-                )
-                }
 
                 {/* STEP 6: STRATEGY DESCRIPTION (NEW) */}
                 {
