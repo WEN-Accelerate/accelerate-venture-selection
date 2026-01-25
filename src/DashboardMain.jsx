@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
@@ -6,9 +7,12 @@ import {
     Trash2, Plus, Wand2, GraduationCap, Box, Play, Send
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
-import ConsultantDashboard from './ConsultantDashboard';
 
-import { supabase } from './supabaseClient';
+// --- CONFIG ---
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function DashboardMain() {
     const [user, setUser] = useState(null);
@@ -17,8 +21,6 @@ export default function DashboardMain() {
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
     const [selectedCard, setSelectedCard] = useState(null); // For Modal
-    const [userRole, setUserRole] = useState(null); // 'sme' | 'consultant'
-    const [activeProfileId, setActiveProfileId] = useState(null); // For multi-tenancy
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
@@ -100,72 +102,12 @@ export default function DashboardMain() {
 
     const fetchProfile = async (uid) => {
         try {
-            // 0. Check for "Acting As" context (Consultant Mode)
-            const params = new URLSearchParams(window.location.search);
-            const companyId = params.get('companyId');
-
-            if (companyId) {
-                console.log("Loading Profile for Company ID:", companyId);
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', companyId)
-                    .maybeSingle();
-
-                if (data) {
-                    setProfile(data.details);
-                    setActiveProfileId(data.id);
-                    setUserRole('sme');
-                    setLoading(false);
-                    return;
-                }
-            }
-
             // 1. Try finding profile for THIS user
             let { data, error } = await supabase
                 .from('profiles')
-                .select('*')
+                .select('details')
                 .eq('user_id', uid)
                 .maybeSingle();
-
-            if (data && data.details) {
-                setProfile(data.details);
-                setActiveProfileId(data.id);
-                setUserRole('sme');
-                setLoading(false);
-                return;
-            }
-
-            // 1.5 Check if Authorized Consultant (Invitation Only)
-            console.log("Checking consultants table for UID in Dashboard:", uid);
-            const { data: isConsultant, error: cErr } = await supabase
-                .from('consultants')
-                .select('*')
-                .eq('user_id', uid)
-                .maybeSingle();
-
-            if (cErr) console.error("Consultant check error in Dashboard:", cErr);
-            console.log("Consultant check result in Dashboard:", isConsultant);
-
-            if (isConsultant) {
-                console.log("Invitation detected: User is an authorized consultant.");
-                setUserRole('consultant');
-                setLoading(false);
-                return;
-            }
-
-            // 1.6 Backup: Check if they ALREADY manage any companies (legacy/direct assignment)
-            const { data: managedCompanies } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('consultant_id', uid)
-                .limit(1);
-
-            if (managedCompanies && managedCompanies.length > 0) {
-                setUserRole('consultant');
-                setLoading(false);
-                return;
-            }
 
             // 2. If not found, check if we have a Guest ID to adopt (Migration Logic)
             if ((!data || !data.details) && localStorage.getItem('accelerate_guest_id')) {
@@ -253,38 +195,25 @@ export default function DashboardMain() {
         const newProfile = { ...profile, supportMetadata: newMetadata };
         setProfile(newProfile); // Optimistic update
 
-        // Calculate Progress Metrics
-        const totalCards = profile.supportDetails ? Object.keys(profile.supportDetails).length : 0;
-        const plannedCards = Object.values(newMetadata).filter(m => m.subActions && m.subActions.length > 0).length;
-        const progress = totalCards > 0 ? Math.round((plannedCards / totalCards) * 100) : 0;
-
-        const stage = progress > 60 ? 'Execution' : progress > 0 ? 'Planning' : 'Researching';
-
         // Save to DB
         if (user && !user.isAnonymous) {
-            console.log("Saving profile to Supabase...", activeProfileId || user.uid);
+            console.log("Saving profile to Supabase...", user.uid);
 
             const payload = {
+                user_id: user.uid,
                 details: newProfile,
                 company_name: profile.companyName || 'My Company',
-                strategy_progress: progress,
-                venture_stage: stage,
                 updated_at: new Date()
             };
 
-            if (activeProfileId) {
-                payload.id = activeProfileId;
-            } else {
-                payload.user_id = user.uid;
-            }
-
             const { data, error } = await supabase
                 .from('profiles')
-                .upsert([payload], { onConflict: activeProfileId ? 'id' : 'user_id' })
+                .upsert([payload], { onConflict: 'user_id' })
                 .select();
 
             if (error) {
                 console.error("Supabase Save Error:", error);
+                console.error("Payload sent:", payload);
                 alert(`Failed to save: ${error.message || 'Unknown DB Error'}`);
             } else {
                 console.log("Supabase Save Success.", data);
@@ -325,11 +254,6 @@ export default function DashboardMain() {
         });
     }, [profile, filter]);
 
-    const safeLogoUrl = (url) => {
-        if (!url) return null;
-        return url.replace('http://', 'https://');
-    };
-
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <Loader2 className="animate-spin text-red-600 w-12 h-12" />
@@ -369,7 +293,7 @@ export default function DashboardMain() {
                                 We couldn't find a business profile linked to <strong>{user.email || 'this account'}</strong>.
                             </p>
                             <a
-                                href="/profile.html"
+                                href="/index.html"
                                 className="block w-full py-3 bg-[#D32F2F] text-white font-bold rounded-xl hover:bg-red-800 transition-all mb-4"
                             >
                                 Create New Profile
@@ -381,18 +305,12 @@ export default function DashboardMain() {
                         Return to Home
                     </a>
                 </div>
-            </div >
+            </div>
         );
     }
 
 
 
-    // If Consultant Role Detected
-    if (userRole === 'consultant') {
-        return <ConsultantDashboard user={user} onLogout={handleLogout} />;
-    }
-
-    // Default SME Dashboard
     return (
         <div className="min-h-screen bg-[#F4F6F8] font-sans text-gray-900 selection:bg-red-100 selection:text-red-900">
             {/* HEADER */}
@@ -445,14 +363,6 @@ export default function DashboardMain() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {new URLSearchParams(window.location.search).get('companyId') && (
-                            <button
-                                onClick={() => window.location.href = '/dashboard.html'}
-                                className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100 hover:bg-indigo-100 transition-colors"
-                            >
-                                Back to Client List
-                            </button>
-                        )}
                         <div className="text-right hidden md:block">
                             <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
                             <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
@@ -487,7 +397,7 @@ export default function DashboardMain() {
                                 </div>
                                 {profile.logoUrl && (
                                     <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
-                                        <img src={safeLogoUrl(profile.logoUrl)} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                        <img src={profile.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
                                     </div>
                                 )}
                             </div>

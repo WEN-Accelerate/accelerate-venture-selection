@@ -32,7 +32,12 @@ import {
   Download
 } from 'lucide-react';
 
-import { supabase } from './supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+// --- SUPABASE SETUP ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const BRAND_COLORS = {
   red: 'bg-[#D32F2F]', // Wadhwani Red Anchor
@@ -442,40 +447,17 @@ export default function App() {
             .eq('user_id', user.uid)
             .maybeSingle();
 
-          // 2. Consultant check
-          console.log("Checking for UID in consultants table:", user.uid);
-          const { data: isConsultant, error: cErr } = await supabase
-            .from('consultants')
-            .select('user_id')
-            .eq('user_id', user.uid)
-            .maybeSingle();
-
-          if (cErr) console.error("Consultant check error:", cErr);
-
-          const { data: managedCompanies } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('consultant_id', user.uid)
-            .limit(1);
-
-          console.log("isConsultant result:", isConsultant);
-          console.log("managedCompanies result:", managedCompanies);
-
-          if (isConsultant || (managedCompanies && managedCompanies.length > 0)) {
-            console.log("Consultant profile detected, redirecting to Dashboard...");
-            window.location.href = '/dashboard.html';
-            return;
-          }
-
-          // 3. Guest Fallback
+          // 2. Fallback: If no profile and user is anonymous, check for a Guest ID from a previous session
           if ((!data || !data.details) && user.isAnonymous) {
             const guestId = localStorage.getItem('accelerate_guest_id');
             if (guestId) {
+              console.log("Checking for previous guest session:", guestId);
               const guestResult = await supabase
                 .from('profiles')
                 .select('details')
                 .eq('user_id', guestId)
                 .maybeSingle();
+
               if (guestResult.data && guestResult.data.details) {
                 data = guestResult.data;
               }
@@ -483,24 +465,29 @@ export default function App() {
           }
 
           if (data && data.details) {
-            console.log("SME profile found, redirecting to Dashboard...");
+            // Profile found in DB -> Redirect to Dashboard
+            console.log("Profile found, redirecting to Dashboard...");
             window.location.href = '/dashboard.html';
           } else {
+            // CHECK LOCAL STORAGE FALLBACK
             const localData = localStorage.getItem('user_profile_data');
             if (localData) {
+              // Local data exists, assuming valid session -> Dashboard
+              console.log("Local profile found, redirecting to Dashboard...");
               window.location.href = '/dashboard.html';
               return;
             }
 
+            // No profile found ANYWHERE, redirect to wizard
             if (step === 1 && !window.location.search.includes('skip')) {
               window.location.href = '/profile.html';
             } else {
-              setProfileLoading(false);
+              setProfileLoading(false); // Just show the empty form if we are not redirecting
             }
           }
         } catch (err) {
           console.warn("Profile sync error:", err);
-          setProfileLoading(false);
+          setProfileLoading(false); // Error fallback
         }
       };
 

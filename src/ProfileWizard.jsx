@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import {
     ArrowRight, Sparkles, Building2, Users, DollarSign,
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
@@ -8,7 +9,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 import netlifyIdentity from 'netlify-identity-widget';
 
-import { supabase } from './supabaseClient';
+// --- CONFIG ---
+
+// --- CONFIG ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // WADHWANI BRAND ASSETS
 const WADHWANI_LOGO_URL = "/Logo WF.png"; // Local public asset
@@ -486,31 +492,19 @@ export default function ProfileWizard() {
             return;
         }
 
-        const consultantMode = sessionStorage.getItem('accelerate_consultant_mode') === 'true';
-        const consultantId = sessionStorage.getItem('accelerate_consultant_id');
-
         setLoading(true);
-        console.log("Saving to Supabase. Mode:", consultantMode ? 'Consultant' : 'SME');
+        console.log("Saving to Supabase for User:", user.uid);
 
-        const payload = {
-            company_name: profile.companyName,
-            details: profile,
-            updated_at: new Date()
-        };
-
-        let dbOp;
-        if (consultantMode && consultantId) {
-            // Consultant is adding a client
-            payload.consultant_id = consultantId;
-            payload.user_id = null; // SME not yet assigned
-            dbOp = supabase.from('profiles').insert([payload]);
-        } else {
-            // Regular SME onboarding
-            payload.user_id = user.uid;
-            dbOp = supabase.from('profiles').upsert([payload], { onConflict: 'user_id' });
-        }
-
-        const { error } = await dbOp;
+        const { error } = await supabase
+            .from('profiles')
+            .upsert([
+                {
+                    user_id: user.uid,
+                    company_name: profile.companyName,
+                    details: profile,
+                    updated_at: new Date()
+                }
+            ], { onConflict: 'user_id' });
 
         if (error) {
             console.error("Supabase Error:", error);
@@ -530,8 +524,6 @@ export default function ProfileWizard() {
 
         // on successful save, clear local fallback to avoid confusion
         localStorage.removeItem('user_profile_data');
-        sessionStorage.removeItem('accelerate_consultant_mode');
-        sessionStorage.removeItem('accelerate_consultant_id');
 
         // Redirect to Dashboard
         window.location.href = '/dashboard.html';
@@ -593,15 +585,6 @@ export default function ProfileWizard() {
                                 <Sparkles size={14} className="text-indigo-500" />
                                 AI will attempt to auto-fill your profile details on the next page.
                             </p>
-
-                            <div className="pt-6 border-t border-gray-100 mt-6 text-center">
-                                <button
-                                    onClick={() => window.location.href = '/dashboard.html'}
-                                    className="text-xs font-bold text-gray-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
-                                >
-                                    I am a Consultant / Advisor →
-                                </button>
-                            </div>
                             <button
                                 onClick={handleScrape}
                                 disabled={!profile.companyName}
