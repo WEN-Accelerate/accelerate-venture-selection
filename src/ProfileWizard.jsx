@@ -711,6 +711,16 @@ export default function ProfileWizard() {
                                 )}
                             </div>
                         </div>
+
+                        <div className="flex justify-center mt-6">
+                            <button
+                                onClick={() => handleLearnMore(profile.ventureType)}
+                                className="text-sm font-semibold text-indigo-600 flex items-center gap-2 hover:underline bg-indigo-50 px-4 py-2 rounded-lg"
+                            >
+                                <Info size={16} /> Explore {profile.ventureType} Strategies
+                            </button>
+                        </div>
+
                         <button key="next4" onClick={handleNext} className="w-full mt-6 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors">
                             Next
                         </button>
