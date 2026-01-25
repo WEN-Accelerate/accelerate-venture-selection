@@ -448,17 +448,23 @@ export default function App() {
             .maybeSingle();
 
           // 2. Consultant check
-          const { data: isConsultant } = await supabase
+          console.log("Checking for UID in consultants table:", user.uid);
+          const { data: isConsultant, error: cErr } = await supabase
             .from('consultants')
             .select('user_id')
             .eq('user_id', user.uid)
             .maybeSingle();
+
+          if (cErr) console.error("Consultant check error:", cErr);
 
           const { data: managedCompanies } = await supabase
             .from('profiles')
             .select('id')
             .eq('consultant_id', user.uid)
             .limit(1);
+
+          console.log("isConsultant result:", isConsultant);
+          console.log("managedCompanies result:", managedCompanies);
 
           if (isConsultant || (managedCompanies && managedCompanies.length > 0)) {
             console.log("Consultant profile detected, redirecting to Dashboard...");

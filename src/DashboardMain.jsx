@@ -142,11 +142,15 @@ export default function DashboardMain() {
             }
 
             // 1.5 Check if Authorized Consultant (Invitation Only)
-            const { data: isConsultant } = await supabase
+            console.log("Checking consultants table for UID in Dashboard:", uid);
+            const { data: isConsultant, error: cErr } = await supabase
                 .from('consultants')
                 .select('*')
                 .eq('user_id', uid)
                 .maybeSingle();
+
+            if (cErr) console.error("Consultant check error in Dashboard:", cErr);
+            console.log("Consultant check result in Dashboard:", isConsultant);
 
             if (isConsultant) {
                 console.log("Invitation detected: User is an authorized consultant.");
