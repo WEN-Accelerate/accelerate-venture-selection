@@ -21,7 +21,7 @@ export default function DashboardMain() {
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
-    const [selectedCard, setSelectedCard] = useState(null); // For Modal
+    const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
@@ -130,9 +130,7 @@ export default function DashboardMain() {
                 owner: meta.owner || ''
             };
         }).filter(card => {
-            if (filter === 'ALL') return card.type !== 'NA'; // Usually hide NA in "Everything" or show? 
-            // The image has "Everything" filter. NA usually might be hidden or shown at end.
-            // Let's assume EVERYTHING shows WF and SELF. The user filter explicitly has 'NA'.
+            if (filter === 'ALL') return card.type !== 'NA'; // Usually hide NA in "Everything"
             if (filter === 'NA') return card.type === 'NA';
             return card.type === filter; // WF or Self
         });
@@ -162,95 +160,136 @@ export default function DashboardMain() {
                     <p className="text-gray-500 text-sm font-medium italic mt-1">Expansion Execution: {profile.companyName}</p>
                 </div>
 
-                {/* FILTERS */}
-                <div className="bg-gray-100 p-1 rounded-full flex gap-1 shadow-inner">
-                    <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
-                    <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
-                    <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
-                    <FilterButton label="NA" active={filter === 'NA'} onClick={() => setFilter('NA')} />
+                {/* VIEW MODE TOGGLE */}
+                <div className="bg-gray-100 p-1 rounded-xl flex gap-1 shadow-inner relative">
+                    <button
+                        onClick={() => setViewMode('context')}
+                        className={`px-8 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 ${viewMode === 'context'
+                            ? 'bg-gray-900 text-white shadow-lg transform scale-105 ring-1 ring-gray-900/10'
+                            : 'text-gray-400 hover:text-gray-900 hover:bg-gray-200'
+                            }`}
+                    >
+                        Strategic Context
+                    </button>
+                    <button
+                        onClick={() => setViewMode('sprint')}
+                        className={`px-8 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all duration-300 ${viewMode === 'sprint'
+                            ? 'bg-[#D32F2F] text-white shadow-lg transform scale-105 ring-1 ring-red-900/10'
+                            : 'text-gray-400 hover:text-red-900 hover:bg-red-50'
+                            }`}
+                    >
+                        Execution Sprint
+                    </button>
                 </div>
             </header>
 
-            {/* STRATEGY SNAPSHOT */}
-            <main className="max-w-7xl mx-auto px-8 pt-8 pb-4">
-                <div className="bg-gray-900 text-white rounded-[2rem] p-8 shadow-2xl relative overflow-hidden mb-8">
-                    {/* Decorative elements */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
+            {/* MAIN CONTENT AREA */}
+            <main className="max-w-7xl mx-auto px-8 pt-8 pb-20">
 
-                    <div className="relative z-10">
-                        {/* Top Row */}
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/10 pb-6 gap-6">
+                {/* VIEW: CONTEXT (STRATEGY SNAPSHOT) */}
+                {viewMode === 'context' && (
+                    <div className="bg-gray-900 text-white rounded-[2rem] p-10 shadow-2xl relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Decorative elements */}
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                        <div className="absolute bottom-0 left-0 w-48 h-48 bg-red-500/10 rounded-full blur-3xl -ml-10 -mb-10 pointer-events-none"></div>
+
+                        <div className="relative z-10">
+                            {/* Top Row */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 border-b border-white/10 pb-8 gap-6">
+                                <div>
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-2 mb-3">
+                                        <Target size={14} className="text-red-500" /> Strategic Direction
+                                    </label>
+                                    <div className="flex items-center gap-4 text-4xl font-black tracking-tight text-white">
+                                        {profile.ventureType === 'Domestic' ?
+                                            <Building2 size={40} className="text-orange-400" /> :
+                                            <Globe size={40} className="text-indigo-400" />
+                                        }
+                                        {profile.ventureType} Expansion
+                                    </div>
+                                </div>
+                                <div className="text-left md:text-right bg-white/5 p-6 rounded-2xl border border-white/10 shadow-inner">
+                                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2">4-Year Revenue Target</label>
+                                    <div className="text-4xl font-black text-emerald-400 tracking-tighter">
+                                        {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Description */}
+                            <div className="mb-10">
+                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-4">Core Strategy Statement</label>
+                                <p className="text-xl text-gray-200 leading-relaxed font-light border-l-4 border-red-500 pl-8 italic">
+                                    "{profile.strategyDescription || 'No summary provided.'}"
+                                </p>
+                            </div>
+
+                            {/* 4Ps Grid */}
                             <div>
-                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
-                                    <Target size={14} className="text-red-500" /> Strategic Direction
-                                </label>
-                                <div className="flex items-center gap-3 text-3xl font-black tracking-tight text-white">
-                                    {profile.ventureType === 'Domestic' ?
-                                        <Building2 size={32} className="text-orange-400" /> :
-                                        <Globe size={32} className="text-indigo-400" />
-                                    }
-                                    {profile.ventureType} Expansion
-                                </div>
-                            </div>
-                            <div className="text-left md:text-right bg-white/5 p-4 rounded-xl border border-white/10">
-                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-1">4-Year Revenue Target</label>
-                                <div className="text-3xl font-black text-emerald-400">
-                                    {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div className="mb-8">
-                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-3">Core Strategy Statement</label>
-                            <p className="text-lg text-gray-200 leading-relaxed font-light border-l-4 border-red-500 pl-6 italic">
-                                "{profile.strategyDescription || 'No summary provided.'}"
-                            </p>
-                        </div>
-
-                        {/* 4Ps Grid */}
-                        <div>
-                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-4">Execution Framework (4Ps)</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Product</div>
-                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.product || '-'}</div>
-                                </div>
-                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Proposition</div>
-                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.proposition || '-'}</div>
-                                </div>
-                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Channel (Place)</div>
-                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.place || '-'}</div>
-                                </div>
-                                <div className="bg-white/5 p-5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
-                                    <div className="text-[10px] text-indigo-300 font-bold uppercase mb-2">Promotion</div>
-                                    <div className="text-sm font-medium text-gray-100 leading-snug">{profile.strategyDimensions?.promotion || '-'}</div>
+                                <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-5">Execution Framework (4Ps)</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
+                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Product
+                                        </div>
+                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.product || '-'}</div>
+                                    </div>
+                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
+                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Proposition
+                                        </div>
+                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.proposition || '-'}</div>
+                                    </div>
+                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
+                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Channel (Place)
+                                        </div>
+                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.place || '-'}</div>
+                                    </div>
+                                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 hover:bg-white/10 transition-all hover:scale-[1.02] duration-300 group">
+                                        <div className="text-[10px] text-indigo-300 font-bold uppercase mb-3 flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span> Promotion
+                                        </div>
+                                        <div className="text-base font-medium text-gray-100 leading-snug group-hover:text-white">{profile.strategyDimensions?.promotion || '-'}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </main>
+                )}
 
-            {/* GRID */}
-            <main className="max-w-7xl mx-auto px-8 pb-20">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {cards.map(card => (
-                        <KaizenCard
-                            key={card.id}
-                            card={card}
-                            onClick={() => setSelectedCard(card)}
-                        />
-                    ))}
-                    {cards.length === 0 && (
-                        <div className="col-span-full text-center py-20 text-gray-400">
-                            No items found for this filter.
+                {/* VIEW: SPRINT (CARDS) */}
+                {viewMode === 'sprint' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* SPRINT FILTERS */}
+                        <div className="flex justify-center mb-10">
+                            <div className="bg-white p-1.5 rounded-full flex gap-1 shadow-sm border border-gray-100">
+                                <FilterButton label="Everything" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
+                                <FilterButton label="WF" active={filter === 'WF'} onClick={() => setFilter('WF')} />
+                                <FilterButton label="Self" active={filter === 'Self'} onClick={() => setFilter('Self')} />
+                                <FilterButton label="NA" active={filter === 'NA'} onClick={() => setFilter('NA')} />
+                            </div>
                         </div>
-                    )}
-                </div>
+
+                        {/* GRID */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {cards.map(card => (
+                                <KaizenCard
+                                    key={card.id}
+                                    card={card}
+                                    onClick={() => setSelectedCard(card)}
+                                />
+                            ))}
+                            {cards.length === 0 && (
+                                <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-3xl">
+                                    <Filter size={48} className="mb-4 opacity-20" />
+                                    <p className="text-sm font-semibold">No items found for this filter.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
             </main>
 
             {/* MODAL */}
