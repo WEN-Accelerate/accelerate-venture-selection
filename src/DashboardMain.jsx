@@ -21,10 +21,25 @@ export default function DashboardMain() {
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
     const [selectedCard, setSelectedCard] = useState(null); // For Modal
+    const [consultantMode, setConsultantMode] = useState(false);
+    const [viewingCompanyId, setViewingCompanyId] = useState(null);
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
         netlifyIdentity.init();
+
+        // Check if in consultant viewing mode
+        const isConsultantMode = sessionStorage.getItem('consultant_mode') === 'true';
+        const companyId = sessionStorage.getItem('viewing_company_id');
+
+        if (isConsultantMode && companyId) {
+            setConsultantMode(true);
+            setViewingCompanyId(companyId);
+            // Load the company profile directly
+            fetchProfile(companyId);
+            setLoading(false);
+            return;
+        }
 
         const currentUser = netlifyIdentity.currentUser();
         if (currentUser) {
@@ -91,7 +106,12 @@ export default function DashboardMain() {
     };
 
     const handleLogout = () => {
-        if (user && user.isAnonymous) {
+        if (consultantMode) {
+            // Clear consultant viewing session and return to consultant dashboard
+            sessionStorage.removeItem('consultant_mode');
+            sessionStorage.removeItem('viewing_company_id');
+            window.location.href = '/consultant.html';
+        } else if (user && user.isAnonymous) {
             // Clear guest session
             localStorage.removeItem('accelerate_guest_id'); // Optional: decide if we want to clear or keep
             window.location.href = '/index.html';
@@ -332,6 +352,14 @@ export default function DashboardMain() {
                         <h1 className="text-xl font-bold font-barlow tracking-tight text-gray-900">
                             Accelerate <span className="text-red-600">Dashboard</span>
                         </h1>
+                        {consultantMode && (
+                            <>
+                                <div className="h-4 w-[1px] bg-gray-300 mx-1"></div>
+                                <span className="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+                                    Consultant View
+                                </span>
+                            </>
+                        )}
                     </div>
 
                     {/* CENTER: VIEW MODE TOGGLE */}

@@ -128,10 +128,22 @@ export default function ProfileWizard() {
 
     // Auth State
     const [user, setUser] = useState(null);
+    const [consultantMode, setConsultantMode] = useState(false);
+    const [consultantContext, setConsultantContext] = useState(null);
 
     useEffect(() => {
         // Initialize Netlify Identity
         netlifyIdentity.init();
+
+        // Check if in consultant mode
+        const isConsultantMode = sessionStorage.getItem('consultant_mode') === 'true';
+        const consultantId = sessionStorage.getItem('consultant_id');
+        const consultantUserId = sessionStorage.getItem('consultant_user_id');
+
+        if (isConsultantMode && consultantId) {
+            setConsultantMode(true);
+            setConsultantContext({ consultantId, consultantUserId });
+        }
 
         const currentUser = netlifyIdentity.currentUser();
         if (currentUser) {
@@ -140,8 +152,8 @@ export default function ProfileWizard() {
                 email: currentUser.email,
                 isAnonymous: false
             });
-        } else {
-            // Guest Logic
+        } else if (!isConsultantMode) {
+            // Guest Logic (only if not in consultant mode)
             const guestId = localStorage.getItem('accelerate_guest_id') || `guest_${Math.random().toString(36).substr(2, 9)}`;
             localStorage.setItem('accelerate_guest_id', guestId);
             setUser({ uid: guestId, isAnonymous: true });
@@ -507,46 +519,86 @@ export default function ProfileWizard() {
 
     // --- FINAL SAVE ---
     const handleSave = async () => {
-        if (!user || !user.uid) {
+        // In consultant mode, create a new company user ID
+        let targetUserId = user?.uid;
+
+        if (consultantMode) {
+            // Generate a unique ID for the new company
+            targetUserId = `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            console.log("Consultant Mode: Creating company with ID:", targetUserId);
+        } else if (!user || !user.uid) {
             alert("Authentication missing. Please reload or sign in.");
             return;
         }
 
         setLoading(true);
-        console.log("Saving to Supabase for User:", user.uid);
+        console.log("Saving to Supabase for User:", targetUserId);
 
-        const { error } = await supabase
+        // Save the company profile
+        const { error: profileError } = await supabase
             .from('profiles')
             .upsert([
                 {
-                    user_id: user.uid,
+                    user_id: targetUserId,
                     company_name: profile.companyName,
+                    role: 'sme', // Always SME for companies
                     details: profile,
                     updated_at: new Date()
                 }
             ], { onConflict: 'user_id' });
 
-        if (error) {
-            console.error("Supabase Error:", error);
-            // FALLBACK: Save to LocalStorage so the user can still proceed!
-            console.log("Falling back to local storage...");
-            localStorage.setItem('user_profile_data', JSON.stringify({
-                companyName: profile.companyName,
-                details: profile,
-                updated_at: new Date()
-            }));
+        if (profileError) {
+            console.error("Supabase Error:", profileError);
 
-            alert(`Note: Database request failed (${error.message}). \n\nWe saved your profile locally so you can continue to the dashboard.`);
-            window.location.href = '/dashboard.html';
+            if (!consultantMode) {
+                // FALLBACK: Save to LocalStorage for non-consultant mode
+                console.log("Falling back to local storage...");
+                localStorage.setItem('user_profile_data', JSON.stringify({
+                    companyName: profile.companyName,
+                    details: profile,
+                    updated_at: new Date()
+                }));
+                alert(`Note: Database request failed (${profileError.message}). \n\nWe saved your profile locally so you can continue to the dashboard.`);
+                window.location.href = '/dashboard.html';
+            } else {
+                alert(`Failed to create company: ${profileError.message}`);
+            }
+
             setLoading(false);
             return;
         }
 
-        // on successful save, clear local fallback to avoid confusion
-        localStorage.removeItem('user_profile_data');
+        // If in consultant mode, create the assignment
+        if (consultantMode && consultantContext) {
+            const { error: assignmentError } = await supabase
+                .from('company_assignments')
+                .insert([
+                    {
+                        consultant_id: consultantContext.consultantId,
+                        company_user_id: targetUserId,
+                        assigned_by: consultantContext.consultantUserId,
+                        notes: `Created via wizard on ${new Date().toLocaleDateString()}`
+                    }
+                ]);
 
-        // Redirect to Dashboard
-        window.location.href = '/dashboard.html';
+            if (assignmentError) {
+                console.error("Assignment Error:", assignmentError);
+                alert(`Company created but assignment failed: ${assignmentError.message}`);
+            }
+
+            // Clear consultant session data
+            sessionStorage.removeItem('consultant_mode');
+            sessionStorage.removeItem('consultant_id');
+            sessionStorage.removeItem('consultant_user_id');
+
+            // Redirect back to consultant dashboard
+            window.location.href = '/consultant.html';
+        } else {
+            // Regular user flow
+            localStorage.removeItem('user_profile_data');
+            window.location.href = '/dashboard.html';
+        }
+
         setLoading(false);
     };
 
