@@ -2,6 +2,14 @@
   command = "npm run build"
   publish = "dist"
 
+# Allow admin-consultant.html to load directly (no redirect)
+[[redirects]]
+  from = "/admin-consultant.html"
+  to = "/admin-consultant.html"
+  status = 200
+  force = true
+
+# Catch-all redirect for SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
