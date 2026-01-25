@@ -24,6 +24,14 @@ BEGIN
     END IF;
 END $$;
 
+-- 2.5 Create Consultants Table if it doesn't exist (Invitation List)
+CREATE TABLE IF NOT EXISTS consultants (
+    user_id TEXT PRIMARY KEY, -- The User ID who is a consultant
+    name TEXT,
+    email TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
 -- 3. Make user_id nullable (Consultants can create profiles without an SME user assigned)
 ALTER TABLE profiles ALTER COLUMN user_id DROP NOT NULL;
 
