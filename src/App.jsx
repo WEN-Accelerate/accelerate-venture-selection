@@ -1020,19 +1020,15 @@ export default function App() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Annual Revenue</label>
-                  <select
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Expected Revenue FY26 (INR Cr)</label>
+                  <input
                     required
+                    type="number"
                     className="w-full p-3 border border-gray-300 rounded-lg bg-white"
+                    placeholder="e.g. 50"
                     value={businessData.revenue}
                     onChange={e => setBusinessData({ ...businessData, revenue: e.target.value })}
-                  >
-                    <option value="">Select Range</option>
-                    <option value="<1M">&lt; $1M / ₹8Cr</option>
-                    <option value="1M-5M">$1M - $5M</option>
-                    <option value="5M-20M">$5M - $20M</option>
-                    <option value=">20M">&gt; $20M</option>
-                  </select>
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Employees</label>

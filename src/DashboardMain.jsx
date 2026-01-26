@@ -194,6 +194,32 @@ export default function DashboardMain() {
                     }
                 }
             }
+            // 2.5 Check for Email Match (Consultant Invitation Adoption)
+            if ((!data || !data.details) && nUser && nUser.email) {
+                console.log("Checking for profile by email (Adoption):", nUser.email);
+                const { data: emailProfile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('email', nUser.email)
+                    .maybeSingle();
+
+                if (emailProfile && emailProfile.user_id !== uid) {
+                    console.log("Found profile by email. Adopting ownership to:", uid);
+
+                    // Update the profile to belong to the new real user
+                    const { error: adoptError } = await supabase
+                        .from('profiles')
+                        .update({ user_id: uid })
+                        .eq('id', emailProfile.id); // Safer to use primary key ID
+
+                    if (!adoptError) {
+                        console.log("Adoption successful!");
+                        data = { details: emailProfile.details };
+                    } else {
+                        console.error("Adoption failed:", adoptError);
+                    }
+                }
+            }
 
             // 3. If STILL not found, check LocalStorage Fallback (user_profile_data)
             // This handles cases where Supabase write failed in Wizard, but Local write succeeded.

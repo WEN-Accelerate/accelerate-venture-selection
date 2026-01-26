@@ -97,6 +97,7 @@ export default function ProfileWizard() {
 
     const [profile, setProfile] = useState({
         companyName: "",
+        clientEmail: "", // Added for Consultant Mode
         industry: "",
         products: "",
         customers: "",
@@ -546,7 +547,7 @@ export default function ProfileWizard() {
                 {
                     user_id: targetUserId,
                     company_name: profile.companyName,
-                    email: consultantMode ? null : user.email,
+                    email: consultantMode ? profile.clientEmail : user.email,
                     full_name: consultantMode ? profile.companyName : (user.displayName || user.email),
                     details: profile,
                     updated_at: new Date()
@@ -658,6 +659,24 @@ export default function ProfileWizard() {
                                 placeholder="e.g. Acme Industries"
                                 autoFocus
                             />
+
+                            {/* Consultant Mode: Add Client Email */}
+                            {consultantMode && (
+                                <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Client Email (For future access)</label>
+                                    <input
+                                        type="email"
+                                        value={profile.clientEmail}
+                                        onChange={(e) => setProfile({ ...profile, clientEmail: e.target.value })}
+                                        className="w-full text-lg p-4 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-300 font-light"
+                                        placeholder="client@company.com"
+                                    />
+                                    <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                                        <Info size={12} />
+                                        This allows the client to claim this profile later.
+                                    </p>
+                                </div>
+                            )}
                             <p className="text-sm text-gray-500 flex items-center gap-2">
                                 <Sparkles size={14} className="text-indigo-500" />
                                 AI will attempt to auto-fill your profile details on the next page.
@@ -762,21 +781,18 @@ export default function ProfileWizard() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                                            Annual Revenue (INR Cr) <Info size={14} className="text-gray-400" />
+                                            Expected Revenue FY26 (INR Crores) <Info size={14} className="text-gray-400" />
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-3.5 text-gray-400 font-bold">₹</span>
-                                            <select
+                                            <input
+                                                type="number"
                                                 value={profile.revenue}
                                                 onChange={e => setProfile({ ...profile, revenue: e.target.value })}
-                                                className="w-full p-3 pl-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none appearance-none cursor-pointer"
-                                            >
-                                                <option value="">Select Revenue Range</option>
-                                                <option value="<1M">&lt; $1M / ₹8Cr</option>
-                                                <option value="1M-5M">$1M - $5M</option>
-                                                <option value="5M-20M">$5M - $20M</option>
-                                                <option value=">20M">&gt; $20M</option>
-                                            </select>
+                                                className="w-full p-3 pl-10 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                                                placeholder="e.g. 50"
+                                            />
+                                            <span className="absolute right-4 top-3.5 text-gray-400 font-bold text-sm">Cr</span>
                                         </div>
                                     </div>
                                     <div>
