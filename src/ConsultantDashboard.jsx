@@ -53,9 +53,9 @@ export default function ConsultantDashboard() {
             fetchClients(u.email);
             setLoading(false);
         } else {
-            alert("Access Denied: You are not registered as a consultant.");
-            await netlifyIdentity.logout();
-            window.location.href = '/index.html';
+            // Redirect to onboarding if not found
+            console.log("Consultant not found. Redirecting to onboarding...");
+            window.location.href = '/consultant-onboarding.html';
         }
     };
 
