@@ -221,15 +221,15 @@ function ClientCard({ client }) {
             className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group cursor-pointer relative overflow-hidden"
         >
             <div className="flex justify-between items-start mb-6">
-                {data.logo ? (
-                    <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 p-1 flex items-center justify-center overflow-hidden">
+                <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center overflow-hidden shadow-sm">
+                    {data.logo ? (
                         <img src={data.logo} alt="Logo" className="w-full h-full object-contain" />
-                    </div>
-                ) : (
-                    <div className="w-12 h-12 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black text-xl">
-                        {data.companyName?.charAt(0) || 'C'}
-                    </div>
-                )}
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-lg rounded-lg">
+                            {data.companyName?.charAt(0) || 'C'}
+                        </div>
+                    )}
+                </div>
                 <div className="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                     {stage === 'Domestic' ? 'Scaling' : 'Researching'}
                 </div>
