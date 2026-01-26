@@ -1424,7 +1424,7 @@ export default function ProfileWizard() {
                                     disabled={!transcriptSupport}
                                     className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
-                                    {isProcessingSupport ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
+                                    {isProcessingTranscript ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
                                     Analyze with AI
                                 </button>
                             </div>
