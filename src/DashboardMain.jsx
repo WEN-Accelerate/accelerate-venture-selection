@@ -22,6 +22,7 @@ export default function DashboardMain() {
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
     const [selectedCard, setSelectedCard] = useState(null); // For Modal
     const [isConsultantView, setIsConsultantView] = useState(false); // New state for consultant back button
+    const [consultantName, setConsultantName] = useState('');
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
@@ -130,7 +131,7 @@ export default function DashboardMain() {
             if (nUser && nUser.email) {
                 const { data: cData } = await supabase
                     .from('consultants')
-                    .select('id')
+                    .select('id, name')
                     .eq('email', nUser.email)
                     .maybeSingle();
 
@@ -145,6 +146,7 @@ export default function DashboardMain() {
                         // Swap the UID to fetch the CLIENT'S profile, not the consultant's own (which is null/empty)
                         uid = viewClientId;
                         setIsConsultantView(true);
+                        setConsultantName(cData.name || nUser.user_metadata?.full_name);
                     } else {
                         // Consultant trying to view their own "Dashboard" (which doesn't exist here) -> Redirect
                         console.log("Redirecting Consultant from SME Dashboard (No Client Selected)...");
@@ -430,16 +432,22 @@ export default function DashboardMain() {
                             </a>
                         )}
                         <div className="text-right hidden md:block">
-                            <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
+                            <div className="text-xs font-bold text-gray-900">
+                                {isConsultantView ? consultantName : (user?.displayName || 'Guest User')}
+                            </div>
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">
+                                {isConsultantView ? 'Advisor View' : profile.industry}
+                            </div>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-all"
-                            title="Log Out"
-                        >
-                            <LogOut size={20} />
-                        </button>
+                        {!isConsultantView && (
+                            <button
+                                onClick={handleLogout}
+                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full transition-all"
+                                title="Log Out"
+                            >
+                                <LogOut size={20} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
