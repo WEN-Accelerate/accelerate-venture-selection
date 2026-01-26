@@ -388,7 +388,7 @@ export default function ProfileWizard() {
         if (supportStep < 1) { // 2 pages total (0, 1)
             setSupportStep(prev => prev + 1);
         } else {
-            handleNext();
+            setStep(9); // Explicitly go to Step 9
         }
     };
 
@@ -396,7 +396,7 @@ export default function ProfileWizard() {
         if (supportStep > 0) {
             setSupportStep(prev => prev - 1);
         } else {
-            handleBack();
+            setStep(7.5); // Go back to Transcript screen
         }
     };
 
@@ -808,15 +808,7 @@ export default function ProfileWizard() {
                         <div className="space-y-6">
                             {/* Short Fields Row */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Logo URL</label>
-                                    <input
-                                        value={profile.logoUrl || ''}
-                                        onChange={e => setProfile({ ...profile, logoUrl: e.target.value })}
-                                        className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
-                                        placeholder="https://example.com/logo.png"
-                                    />
-                                </div>
+
 
                                 {/* Location & Hub */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
