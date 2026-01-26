@@ -21,6 +21,7 @@ export default function DashboardMain() {
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
     const [selectedCard, setSelectedCard] = useState(null); // For Modal
+    const [isConsultantView, setIsConsultantView] = useState(false); // New state for consultant back button
 
     // --- AUTH & DATA SYNC ---
     useEffect(() => {
@@ -143,6 +144,7 @@ export default function DashboardMain() {
                         console.log("Consultant viewing client:", viewClientId);
                         // Swap the UID to fetch the CLIENT'S profile, not the consultant's own (which is null/empty)
                         uid = viewClientId;
+                        setIsConsultantView(true);
                     } else {
                         // Consultant trying to view their own "Dashboard" (which doesn't exist here) -> Redirect
                         console.log("Redirecting Consultant from SME Dashboard (No Client Selected)...");
@@ -419,6 +421,14 @@ export default function DashboardMain() {
                     </div>
 
                     <div className="flex items-center gap-4">
+                        {isConsultantView && (
+                            <a
+                                href="/consultant.html"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-700 text-xs font-bold rounded-lg border border-red-100 hover:bg-red-100 transition-colors uppercase tracking-wide"
+                            >
+                                <LayoutGrid size={14} /> Back to Portfolio
+                            </a>
+                        )}
                         <div className="text-right hidden md:block">
                             <div className="text-xs font-bold text-gray-900">{user?.displayName || 'Guest User'}</div>
                             <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{profile.industry}</div>
