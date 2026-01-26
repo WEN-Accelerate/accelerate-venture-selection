@@ -118,8 +118,13 @@ export default function DashboardMain() {
             // Better: Pass email to fetchProfile or get it from netlifyIdentity.
             // Let's refactor fetchProfile to take email too or get it from Netlify.
 
+            // 0. FIRST: Check if this user is a consultant (Redirect Guard)
             // REFACTOR: Logic inline here.
-            // I'll check Netlify user directly since that's the source of truth for "logged in user".
+
+            // Check for Client View Mode
+            const params = new URLSearchParams(window.location.search);
+            const viewClientId = params.get('view_client_id');
+
             const nUser = netlifyIdentity.currentUser();
             if (nUser && nUser.email) {
                 const { data: cData } = await supabase
@@ -128,10 +133,22 @@ export default function DashboardMain() {
                     .eq('email', nUser.email)
                     .maybeSingle();
 
+                // If User IS a Consultant
                 if (cData) {
-                    console.log("Redirecting Consultant from SME Dashboard...");
-                    window.location.href = '/consultant.html';
-                    return;
+                    if (viewClientId) {
+                        // Consultant is trying to view a client. ALLOW access.
+                        // Ideally, check if assigned:
+                        // const { data: assignment } = await supabase.from('consultant_clients')....
+
+                        console.log("Consultant viewing client:", viewClientId);
+                        // Swap the UID to fetch the CLIENT'S profile, not the consultant's own (which is null/empty)
+                        uid = viewClientId;
+                    } else {
+                        // Consultant trying to view their own "Dashboard" (which doesn't exist here) -> Redirect
+                        console.log("Redirecting Consultant from SME Dashboard (No Client Selected)...");
+                        window.location.href = '/consultant.html';
+                        return;
+                    }
                 }
             }
 

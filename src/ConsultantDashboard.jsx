@@ -192,7 +192,10 @@ function ClientCard({ client }) {
     const progress = Math.round((filled / fields.length) * 100);
 
     return (
-        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group cursor-pointer relative overflow-hidden">
+        <div
+            onClick={() => window.location.href = `/dashboard.html?view_client_id=${client.user_id}`}
+            className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group cursor-pointer relative overflow-hidden"
+        >
             <div className="flex justify-between items-start mb-6">
                 <div className="w-12 h-12 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black text-xl">
                     {data.companyName?.charAt(0) || 'C'}

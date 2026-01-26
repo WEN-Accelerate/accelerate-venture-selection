@@ -447,6 +447,10 @@ export default function App() {
         try {
           // 0. FIRST: Check if this user is a consultant
           // If so, they are always redirected to the Consultant Portal
+          // UNLESS they are trying to view a specific client
+          const params = new URLSearchParams(window.location.search);
+          const viewClientId = params.get('view_client_id');
+
           if (!user.isAnonymous && user.email) {
             const { data: consultantData } = await supabase
               .from('consultants')
@@ -455,9 +459,15 @@ export default function App() {
               .maybeSingle();
 
             if (consultantData) {
-              console.log("User is a consultant. Redirecting to Advisor Portal...");
-              window.location.href = '/consultant.html';
-              return;
+              if (viewClientId) {
+                console.log("Consultant viewing specific client. Redirecting to Dashboard...");
+                window.location.href = `/dashboard.html?view_client_id=${viewClientId}`;
+                return;
+              } else {
+                console.log("User is a consultant. Redirecting to Advisor Portal...");
+                window.location.href = '/consultant.html';
+                return;
+              }
             }
           }
 
