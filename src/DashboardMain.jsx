@@ -276,11 +276,16 @@ export default function DashboardMain() {
         setProfile(newProfile); // Optimistic update
 
         // Save to DB
-        if (user && !user.isAnonymous) {
-            console.log("Saving profile to Supabase...", user.uid);
+        // Check if Consultant Mode (viewing a client)
+        const params = new URLSearchParams(window.location.search);
+        const viewClientId = params.get('view_client_id');
+        const targetUserId = viewClientId || user.uid;
+
+        if ((user && !user.isAnonymous) || viewClientId) {
+            console.log("Saving profile to Supabase...", targetUserId);
 
             const payload = {
-                user_id: user.uid,
+                user_id: targetUserId,
                 details: newProfile,
                 company_name: profile.companyName || 'My Company',
                 updated_at: new Date()
