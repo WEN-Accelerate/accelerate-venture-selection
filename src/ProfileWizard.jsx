@@ -99,6 +99,9 @@ export default function ProfileWizard() {
         companyName: "",
         clientEmail: "", // Added for Consultant Mode
         industry: "",
+        hub: "", // New: Company Hub
+        location: "", // New: HQ Location
+        logo: "", // New: Logo URL
         products: "",
         customers: "",
         employees: "",
@@ -118,6 +121,11 @@ export default function ProfileWizard() {
     const [hypotheticalExamples, setHypotheticalExamples] = useState({ domestic: "", international: "" });
     const [onePageSummary, setOnePageSummary] = useState("");
     const [onePageLoading, setOnePageLoading] = useState(false);
+
+    // Transcripts State
+    const [transcriptStrategy, setTranscriptStrategy] = useState("");
+    const [transcriptSupport, setTranscriptSupport] = useState("");
+    const [isProcessingTranscript, setIsProcessingTranscript] = useState(false);
 
     // Check for Consultant Mode
     useEffect(() => {
@@ -219,6 +227,8 @@ export default function ProfileWizard() {
             {
                 "name": "Legal Name",
                 "industry": "Industry Category",
+                "location": "HQ City, State",
+                "logo": "URL to company logo (best guess)",
                 "description": "2 sentence description",
                 "promoters": ["Name 1", "Name 2"],
                 "products": ["Product 1", "Product 2"],
@@ -254,6 +264,8 @@ export default function ProfileWizard() {
                 ...prev,
                 companyName: data.name || prev.companyName,
                 industry: data.industry || "",
+                location: data.location || "",
+                logo: data.logo || "",
                 products: Array.isArray(data.products) ? data.products.join(", ") : (data.products || ""),
                 customers: Array.isArray(data.customers) ? data.customers.join(", ") : (data.customers || ""),
                 employees: data.employees || "",
@@ -516,6 +528,98 @@ export default function ProfileWizard() {
         setLoading(false);
     };
 
+    // --- TRANSCRIPT HANDLERS ---
+    const handleRefineStrategyWithTranscript = async () => {
+        if (!transcriptStrategy.trim()) {
+            setStep(5);
+            return;
+        }
+        setIsProcessingTranscript(true);
+        const prompt = `
+            Act as a Strategy Consultant. Refine the expansion strategy for ${profile.companyName} based on this meeting transcript/notes.
+            
+            transcript: "${transcriptStrategy}"
+            
+            Current Context: ${profile.ventureType} Expansion.
+            
+            Task:
+            1. Summarize the "How to expand" (Strategy Description) in 2 sentences.
+            2. Extract the 4Ps: Product, Proposition, Place (Channel), Promotion.
+            
+            Return JSON: { "description": "...", "product": "...", "proposition": "...", "place": "...", "promotion": "..." }
+        `;
+
+        try {
+            const raw = await callGemini(prompt);
+            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+            const data = JSON.parse(clean);
+
+            setProfile(prev => ({
+                ...prev,
+                strategyDescription: data.description || prev.strategyDescription,
+                strategyDimensions: {
+                    product: data.product || prev.strategyDimensions.product,
+                    proposition: data.proposition || prev.strategyDimensions.proposition,
+                    place: data.place || prev.strategyDimensions.place,
+                    promotion: data.promotion || prev.strategyDimensions.promotion
+                }
+            }));
+            setAiContext("Strategy refined from transcript.");
+            setStep(5); // Proceed to the Strategy Screen
+        } catch (e) {
+            console.error(e);
+            alert("Could not process transcript. Please try again or skip.");
+        }
+        setIsProcessingTranscript(false);
+    };
+
+    const handleAutoFillSupportFromTranscript = async () => {
+        if (!transcriptSupport.trim()) {
+            setSupportStep(0);
+            setStep(8);
+            return;
+        }
+        setIsProcessingTranscript(true);
+        const prompt = `
+            Act as a Growth Diagnostics AI. Analyze this transcript to identify where the company needs EXTERNAL HELP (Wadhwani Foundation Support).
+            
+            Transcript: "${transcriptSupport}"
+            
+            Support Categories:
+            - Product (Market Fit, Feature Roadmap, Tech Stack, UI/UX, QA)
+            - Selling (Sales Scripting, Lead Gen, CRM, Training, Closing)
+            - Placement (Channel Entry, Logistics, E-commerce, Retail, Supply Chain)
+            - Money (Fundraising, Valuation, Modeling, Grants, Cash Flow)
+            - People (Org Structure, Hiring, ESOP, Culture, Performance)
+            - Process (Legal, Accounting, Agile, KPIs, Ops Manuals)
+            
+            Task:
+            Identify specific areas where they need help. Map them to the categories above.
+            Return JSON object where keys are "Category_SubItem" (e.g. "Product_Market Fit") and value is "WF" (for Wadhwani Foundation support) or "Self" (if they are doing it in-house).
+            Only include mentioned items.
+            Example: { "Product_Market Fit": "WF", "Structure_Hiring": "Self" }
+        `;
+
+        try {
+            const raw = await callGemini(prompt);
+            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+            const data = JSON.parse(clean);
+
+            setProfile(prev => ({
+                ...prev,
+                supportDetails: { ...prev.supportDetails, ...data }
+            }));
+
+            setAiContext("Support needs identified from transcript.");
+            setSupportStep(0);
+            setStep(8);
+        } catch (e) {
+            console.error(e);
+            alert("Could not analyze transcript.");
+        }
+        setIsProcessingTranscript(false);
+    };
+
     // --- FINAL SAVE ---
     // --- FINAL SAVE ---
     const handleSave = async () => {
@@ -713,6 +817,53 @@ export default function ProfileWizard() {
                                         placeholder="https://example.com/logo.png"
                                     />
                                 </div>
+
+                                {/* Location & Hub */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">HQ Location</label>
+                                        <input
+                                            value={profile.location}
+                                            onChange={e => setProfile({ ...profile, location: e.target.value })}
+                                            className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                            placeholder="City, State"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Hub</label>
+                                        <select
+                                            value={profile.hub}
+                                            onChange={e => setProfile({ ...profile, hub: e.target.value })}
+                                            className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                        >
+                                            <option value="">Select Hub</option>
+                                            <option value="Ahmedabad">Ahmedabad</option>
+                                            <option value="Pune">Pune</option>
+                                            <option value="Chennai">Chennai</option>
+                                            <option value="Bengaluru">Bengaluru</option>
+                                            <option value="Lucknow">Lucknow</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* Logo */}
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Logo URL</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={profile.logo}
+                                            onChange={e => setProfile({ ...profile, logo: e.target.value })}
+                                            className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
+                                            placeholder="https://example.com/logo.png"
+                                        />
+                                        {profile.logo && (
+                                            <div className="w-12 h-12 border rounded bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                                                <img src={profile.logo} alt="Logo" className="max-w-full max-h-full" onError={(e) => e.target.style.display = 'none'} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Industry</label>
                                     <input
@@ -867,9 +1018,51 @@ export default function ProfileWizard() {
                             </button>
                         </div>
 
-                        <button key="next4" onClick={handleNext} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
-                            Next
+                        <button key="next4" onClick={() => setStep(4.5)} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
+                            Proceed to Strategy
                         </button>
+                    </StepContainer>
+                )}
+
+                {/* STEP 4.5: TRANSCRIPT UPLOAD (STRATEGY) */}
+                {step === 4.5 && (
+                    <StepContainer title="Refine Strategy with Context" onBack={() => setStep(4)} aiContext={aiContext}>
+                        <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full">
+                                    <Mic size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900">Upload Meeting Transcript</h3>
+                                    <p className="text-sm text-gray-600">Provide a transcript or notes from your strategy meetings. AI will use this to auto-fill the strategy framework.</p>
+                                </div>
+                            </div>
+
+                            <textarea
+                                rows={8}
+                                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono text-sm"
+                                placeholder="Paste transcript here..."
+                                value={transcriptStrategy}
+                                onChange={e => setTranscriptStrategy(e.target.value)}
+                            />
+
+                            <div className="flex gap-4 mt-6">
+                                <button
+                                    onClick={() => setStep(5)}
+                                    className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+                                >
+                                    Skip & Fill Manually
+                                </button>
+                                <button
+                                    onClick={handleRefineStrategyWithTranscript}
+                                    disabled={!transcriptStrategy}
+                                    className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessingTranscript ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
+                                    Refine with AI
+                                </button>
+                            </div>
+                        </div>
                     </StepContainer>
                 )}
 
@@ -1141,10 +1334,8 @@ export default function ProfileWizard() {
                             </div>
 
                             {/* 4. EXPANSION STRATEGY */}
-                            <div className="bg-gray-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
-                                {/* Decorative elements */}
-                                <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                                <div className="absolute bottom-0 left-0 w-32 h-32 bg-red-500/10 rounded-full blur-3xl -ml-10 -mb-10"></div>
+                            <div className="bg-gray-50 text-gray-900 rounded-2xl p-6 border border-gray-200">
+                                {/* Decorative elements removed for cleaner look or adapted */}
 
                                 <div className="relative z-10">
                                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-white/10 pb-4 gap-4">
@@ -1157,15 +1348,15 @@ export default function ProfileWizard() {
                                         </div>
                                         <div className="text-left md:text-right">
                                             <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">4-Year Revenue Target</label>
-                                            <div className="text-2xl font-bold text-emerald-400 mt-1">
-                                                {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                            <div className="text-2xl font-bold text-emerald-600 mt-1">
+                                                ₹ {profile.growthTarget || '-'} Cr
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="mb-8">
                                         <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2">Strategy Summary</label>
-                                        <p className="text-gray-200 text-sm leading-relaxed italic border-l-2 border-red-500 pl-4 bg-white/5 p-3 rounded-r-lg">
+                                        <p className="text-gray-700 text-sm leading-relaxed italic border-l-4 border-red-500 pl-4 bg-red-50/50 p-3 rounded-r-lg">
                                             "{profile.strategyDescription || 'No summary provided.'}"
                                         </p>
                                     </div>
@@ -1173,20 +1364,20 @@ export default function ProfileWizard() {
                                     <div>
                                         <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-3">Execution Strategy (4Ps)</label>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="bg-white/10 p-4 rounded-xl border border-white/5">
-                                                <div className="text-[10px] text-indigo-300 font-bold uppercase mb-1">Product</div>
+                                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                                <div className="text-[10px] text-indigo-600 font-bold uppercase mb-1">Product</div>
                                                 <div className="text-sm font-medium">{profile.strategyDimensions?.product || '-'}</div>
                                             </div>
-                                            <div className="bg-white/10 p-4 rounded-xl border border-white/5">
-                                                <div className="text-[10px] text-indigo-300 font-bold uppercase mb-1">Proposition</div>
+                                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                                <div className="text-[10px] text-indigo-600 font-bold uppercase mb-1">Proposition</div>
                                                 <div className="text-sm font-medium">{profile.strategyDimensions?.proposition || '-'}</div>
                                             </div>
-                                            <div className="bg-white/10 p-4 rounded-xl border border-white/5">
-                                                <div className="text-[10px] text-indigo-300 font-bold uppercase mb-1">Channel (Place)</div>
+                                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                                <div className="text-[10px] text-indigo-600 font-bold uppercase mb-1">Channel (Place)</div>
                                                 <div className="text-sm font-medium">{profile.strategyDimensions?.place || '-'}</div>
                                             </div>
-                                            <div className="bg-white/10 p-4 rounded-xl border border-white/5">
-                                                <div className="text-[10px] text-indigo-300 font-bold uppercase mb-1">Promotion</div>
+                                            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                                                <div className="text-[10px] text-indigo-600 font-bold uppercase mb-1">Promotion</div>
                                                 <div className="text-sm font-medium">{profile.strategyDimensions?.promotion || '-'}</div>
                                             </div>
                                         </div>
@@ -1195,7 +1386,7 @@ export default function ProfileWizard() {
                             </div>
                         </div>
 
-                        <button onClick={handleNext} className="w-full mt-8 py-4 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-lg">
+                        <button onClick={() => setStep(7.5)} className="w-full mt-8 py-4 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-lg">
                             Looks Good, Continue <ArrowRight size={20} />
                         </button>
                     </StepContainer>
@@ -1436,3 +1627,4 @@ export default function ProfileWizard() {
         </div >
     );
 }
+```

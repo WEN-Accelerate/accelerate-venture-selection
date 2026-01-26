@@ -581,7 +581,7 @@ export default function DashboardMain() {
                                 <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">4-Year Revenue Target</label>
                                     <div className="text-2xl font-black text-emerald-600">
-                                        {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                        ₹ {profile.growthTarget || '-'} Cr
                                     </div>
                                 </div>
                             </div>
