@@ -1420,7 +1420,7 @@ export default function ProfileWizard() {
                                     Skip & Fill Manually
                                 </button>
                                 <button
-                                    onClick={handleAnalyzeSupportNeeds}
+                                    onClick={handleAutoFillSupportFromTranscript}
                                     disabled={!transcriptSupport}
                                     className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
