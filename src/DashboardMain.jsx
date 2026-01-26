@@ -4,7 +4,7 @@ import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
     BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
-    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send
+    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 
