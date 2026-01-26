@@ -134,8 +134,8 @@ export default function QuarterlyProgress({ profileId, isConsultant }) {
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-xl text-gray-900">{data.quarter_label}</h3>
                                 <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${data.strategy_status === 'Red' ? 'bg-red-100 text-red-700' :
-                                        data.strategy_status === 'Amber' ? 'bg-orange-100 text-orange-700' :
-                                            'bg-emerald-100 text-emerald-700'
+                                    data.strategy_status === 'Amber' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-emerald-100 text-emerald-700'
                                     }`}>
                                     {data.strategy_status}
                                 </div>
@@ -194,16 +194,16 @@ export default function QuarterlyProgress({ profileId, isConsultant }) {
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Strategy Status</label>
                                 <div className="grid grid-cols-3 gap-3">
-                                    {['Green', 'Amber', 'Red'].map(status => (
+                                    {[{ val: 'Green', label: 'Green (On Track)' }, { val: 'Amber', label: 'Amber (Late)' }, { val: 'Red', label: 'Red (Off Track)' }].map(status => (
                                         <button
-                                            key={status}
-                                            onClick={() => setFormData({ ...formData, strategy_status: status })}
-                                            className={`py-2 rounded-lg font-bold text-sm border-2 transition-all ${formData.strategy_status === status
-                                                    ? (status === 'Green' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : status === 'Amber' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-red-500 bg-red-50 text-red-700')
-                                                    : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                            key={status.val}
+                                            onClick={() => setFormData({ ...formData, strategy_status: status.val })}
+                                            className={`py-2 rounded-lg font-bold text-xs border-2 transition-all ${formData.strategy_status === status.val
+                                                ? (status.val === 'Green' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : status.val === 'Amber' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-red-500 bg-red-50 text-red-700')
+                                                : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'
                                                 }`}
                                         >
-                                            {status}
+                                            {status.label}
                                         </button>
                                     ))}
                                 </div>
