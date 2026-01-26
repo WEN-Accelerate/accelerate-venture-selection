@@ -102,6 +102,39 @@ export default function DashboardMain() {
 
     const fetchProfile = async (uid) => {
         try {
+            // 0. FIRST: Check if this user is a consultant (Redirect Guard)
+            const { data: consultantData } = await supabase
+                .from('consultants')
+                .select('id')
+                .eq('email', uid) // Netlify ID might not match email, wait. Netlify currentUser has email.
+            // fetchProfile receives 'uid'. I need email.
+            // 'user' state might not be set yet if calling from useEffect.
+            // Let's rely on currentUser object from calling scope? No, fetchProfile is async.
+            // Let's fetch email from 'auth' or just use the passed uid if it IS the email (rare).
+            // Actually, I should pass the email to fetchProfile or check it if I have the user object.
+            // But 'user' state is set before calling fetchProfile.
+            // However, set is async. 
+            // Simplest way: Check 'user' state? It might be stale in the closure.
+            // Better: Pass email to fetchProfile or get it from netlifyIdentity.
+            // Let's refactor fetchProfile to take email too or get it from Netlify.
+
+            // REFACTOR: Logic inline here.
+            // I'll check Netlify user directly since that's the source of truth for "logged in user".
+            const nUser = netlifyIdentity.currentUser();
+            if (nUser && nUser.email) {
+                const { data: cData } = await supabase
+                    .from('consultants')
+                    .select('id')
+                    .eq('email', nUser.email)
+                    .maybeSingle();
+
+                if (cData) {
+                    console.log("Redirecting Consultant from SME Dashboard...");
+                    window.location.href = '/consultant.html';
+                    return;
+                }
+            }
+
             // 1. Try finding profile for THIS user
             let { data, error } = await supabase
                 .from('profiles')

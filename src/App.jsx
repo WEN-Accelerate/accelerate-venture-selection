@@ -445,6 +445,22 @@ export default function App() {
       setProfileLoading(true); // Start blocking UI while we check profile
       const checkProfile = async () => {
         try {
+          // 0. FIRST: Check if this user is a consultant
+          // If so, they are always redirected to the Consultant Portal
+          if (!user.isAnonymous && user.email) {
+            const { data: consultantData } = await supabase
+              .from('consultants')
+              .select('id')
+              .eq('email', user.email)
+              .maybeSingle();
+
+            if (consultantData) {
+              console.log("User is a consultant. Redirecting to Advisor Portal...");
+              window.location.href = '/consultant.html';
+              return;
+            }
+          }
+
           // 1. Try fetching profile for the current user
           let { data, error } = await supabase
             .from('profiles')
