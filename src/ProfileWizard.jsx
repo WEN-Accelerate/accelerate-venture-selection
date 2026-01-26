@@ -546,6 +546,8 @@ export default function ProfileWizard() {
                 {
                     user_id: targetUserId,
                     company_name: profile.companyName,
+                    email: consultantMode ? null : user.email,
+                    full_name: consultantMode ? profile.companyName : (user.displayName || user.email),
                     details: profile,
                     updated_at: new Date()
                 }

@@ -888,24 +888,56 @@ export default function App() {
     }
   };
 
-  const handleCommitmentSubmit = () => {
+
+
+  const saveToSupabase = async () => {
+    if (!user) return;
+    console.log("Saving progress to Supabase...");
+
+    // Construct the full profile object matching what Dashboard expects
+    const profileData = {
+      companyName: businessData.name,
+      industry: businessData.industry,
+      revenue: businessData.revenue,
+      employees: businessData.employees,
+      description: businessData.description,
+      expansionIdeas: businessData.expansionIdeas,
+      selectedArchetype: selectedArchetype,
+      readinessAnswers: readinessAnswers,
+      // Add other fields as they become available
+      aiArchetypeReasoning: aiArchetypeReasoning,
+      suggestedArchetypes: suggestedArchetypes
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert([
+        {
+          user_id: user.uid,
+          email: user.email,
+          full_name: user.displayName || user.email,
+          company_name: businessData.name,
+          details: profileData,
+          updated_at: new Date()
+        }
+      ], { onConflict: 'user_id' });
+
+    if (error) {
+      console.error("Failed to save to Supabase:", error);
+    } else {
+      console.log("Saved successfully.");
+    }
+  };
+
+  const handleCommitmentSubmit = async () => {
     setLoading(true);
+    // Save to DB before showing final plan
+    await saveToSupabase();
+
     setTimeout(() => {
       setStep(5);
       setLoading(false);
     }, 1500);
-  };
-
-  const restart = () => {
-    setStep(1);
-    setBusinessData({ name: '', industry: '', revenue: '', employees: '', description: '', expansionIdeas: '' });
-    setSelectedArchetype(null);
-    setReadinessAnswers({});
-    setCurrentQuestionIndex(0);
-    setShowAllArchetypes(false);
-    setAiQuestionHelp(null);
-    setAiArchetypeReasoning({});
-    setAiStreamQuestions({});
   };
 
   // --- VIEWS ---
