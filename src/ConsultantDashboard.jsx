@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import {
-    Users, Plus, Building2, TrendingUp, Calendar, ChevronRight, LayoutGrid, LogOut
+    Users, Plus, Building2, TrendingUp, Calendar, ChevronRight, LayoutGrid, LogOut, User
 } from 'lucide-react';
 import netlifyIdentity from 'netlify-identity-widget';
 
@@ -123,6 +123,13 @@ export default function ConsultantDashboard() {
                             <div className="text-sm font-bold text-gray-900">{consultantProfile?.name || user?.email}</div>
                             <div className="text-xs text-green-600 font-bold uppercase tracking-wider">Verified Consultant</div>
                         </div>
+                        <button
+                            onClick={() => window.location.href = '/consultant-onboarding.html'}
+                            className="p-2 text-gray-400 hover:text-indigo-600 bg-gray-50 rounded-full hover:bg-indigo-50 transition-all"
+                            title="Update Profile"
+                        >
+                            <User size={18} />
+                        </button>
                         <button
                             onClick={handleLogout}
                             className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 rounded-full hover:bg-red-50 transition-all"
