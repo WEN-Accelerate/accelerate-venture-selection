@@ -400,6 +400,12 @@ export default function ProfileWizard() {
         }
     };
 
+    // Explicit handler for Skipping Support Transcript
+    const handleSkipSupport = () => {
+        setSupportStep(0);
+        setStep(8);
+    };
+
     const generateOnePager = async () => {
         setOnePageLoading(true);
         const prompt = `
