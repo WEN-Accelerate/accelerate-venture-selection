@@ -1532,7 +1532,7 @@ export default function ProfileWizard() {
                                     <div className="text-right">
                                         <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Target Revenue</div>
                                         <div className="text-xl font-bold text-emerald-600">
-                                            {profile.growthTarget ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(profile.growthTarget) : '-'}
+                                            ₹ {profile.growthTarget || '-'} Cr
                                         </div>
                                     </div>
                                 </div>
@@ -1540,7 +1540,7 @@ export default function ProfileWizard() {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-100">
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Current Rev</label>
-                                        <div className="font-semibold text-gray-900">{profile.revenue}</div>
+                                        <div className="font-semibold text-gray-900">₹ {profile.revenue || '-'} Cr</div>
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Profitability</label>
