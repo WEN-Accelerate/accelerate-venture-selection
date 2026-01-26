@@ -4,9 +4,10 @@ import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
     BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
-    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid
+    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid, BarChart3
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import QuarterlyProgress from './QuarterlyProgressComponent';
 
 // --- CONFIG ---
 
@@ -159,7 +160,7 @@ export default function DashboardMain() {
             // 1. Try finding profile for THIS user
             let { data, error } = await supabase
                 .from('profiles')
-                .select('details')
+                .select('id, details')
                 .eq('user_id', uid)
                 .maybeSingle();
 
@@ -177,7 +178,6 @@ export default function DashboardMain() {
                 if (guestResult.data) {
                     console.log("Found guest profile. Migrating ownership to:", uid);
 
-                    // UPDATE the profile to belong to the new user
                     const { error: updateError } = await supabase
                         .from('profiles')
                         .update({ user_id: uid })
@@ -185,7 +185,7 @@ export default function DashboardMain() {
 
                     if (!updateError) {
                         console.log("Migration successful!");
-                        data = { details: guestResult.data.details };
+                        data = { id: guestResult.data.id, details: guestResult.data.details };
 
                         // Clean up guest ID
                         localStorage.removeItem('accelerate_guest_id');
@@ -214,7 +214,7 @@ export default function DashboardMain() {
 
                     if (!adoptError) {
                         console.log("Adoption successful!");
-                        data = { details: emailProfile.details };
+                        data = { id: emailProfile.id, details: emailProfile.details };
                     } else {
                         console.error("Adoption failed:", adoptError);
                     }
@@ -252,7 +252,8 @@ export default function DashboardMain() {
             }
 
             if (data && data.details) {
-                setProfile(data.details);
+                // Merge ID into profile object for easier access
+                setProfile({ ...data.details, id: data.id });
             }
         } catch (err) {
             console.error("Fetch Error:", err);
@@ -450,6 +451,16 @@ export default function DashboardMain() {
                         >
                             <Briefcase size={12} />
                             Actions
+                        </button>
+                        <button
+                            onClick={() => setViewMode('reviews')}
+                            className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'reviews'
+                                ? 'bg-emerald-600 text-white shadow-md'
+                                : 'text-gray-500 hover:text-emerald-700 hover:bg-emerald-50'
+                                }`}
+                        >
+                            <BarChart3 size={12} />
+                            Reviews
                         </button>
                     </div>
 
@@ -675,6 +686,13 @@ export default function DashboardMain() {
                         </div>
 
                         <ActionCenterView cards={cards} />
+                    </div>
+                )}
+
+                {/* VIEW: REVIEWS (QUARTERLY PROGRESS) */}
+                {viewMode === 'reviews' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto">
+                        <QuarterlyProgress profileId={profile.id} isConsultant={isConsultantView} />
                     </div>
                 )}
 

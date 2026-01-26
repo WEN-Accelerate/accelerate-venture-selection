@@ -64,19 +64,19 @@ export default function ConsultantOnboarding() {
         setScraping(true);
 
         const prompt = `
-      Act as a professional profiler. Research the consultant based on these URLs:
+      Act as a professional profiler. Research the consultant based on these URLs. Priority: Official Website > LinkedIn (if accessible).
       LinkedIn: ${formData.linkedin_url}
       Website: ${formData.website_url}
       
-      Extract the following details in JSON format:
+      Extract the following details in JSON format. Be precise and avoid hallucinating.
       {
-          "name": "Full Name",
-          "location": "City, Country",
-          "industry_focus": "Key industries (comma separated)",
-          "function_focus": "Key functional areas (Strategy, Operations, Finance, etc.)",
-          "bio": "Professional summary (3-4 sentences)",
-          "past_companies": "List of past companies worked at (comma separated)",
-          "other_comments": "Any other relevant info"
+          "name": "Full Name (as found on profile)",
+          "location": "City, Country (e.g. Mumbai, India)",
+          "industry_focus": "Key industries mentioned (e.g. Manufacturing, Retail). Max 3.",
+          "function_focus": "Key functional expertise (e.g. Strategy, Supply Chain). Max 3.",
+          "bio": "A professional summary (3-4 sentences) highlighting experience level and key value proposition.",
+          "past_companies": "List of companies they have worked at or consulted for.",
+          "other_comments": "Notable achievements, awards, or specific methodologies mentioned."
       }
       If specific data is not found, leave it blank. Return ONLY JSON.
       `;
