@@ -341,7 +341,7 @@ export default function ProfileWizard() {
 
     useEffect(() => {
         if (step === 4) generateHypotheticalExamples();
-        if (step === 9) generateOnePager();
+        if (step === 11) generateOnePager();
     }, [step]);
 
     // --- STEP 8: SUPPORT DETAILS ---
@@ -388,7 +388,7 @@ export default function ProfileWizard() {
         if (supportStep < 1) { // 2 pages total (0, 1)
             setSupportStep(prev => prev + 1);
         } else {
-            setStep(9); // Explicitly go to Step 9
+            setStep(11); // Explicitly go to Step 11 (Summary)
         }
     };
 
@@ -396,14 +396,14 @@ export default function ProfileWizard() {
         if (supportStep > 0) {
             setSupportStep(prev => prev - 1);
         } else {
-            setStep(7.5); // Go back to Transcript screen
+            setStep(9); // Go back to Transcript screen (Step 9)
         }
     };
 
     // Explicit handler for Skipping Support Transcript
     const handleSkipSupport = () => {
         setSupportStep(0);
-        setStep(8);
+        setStep(10); // Go to Support Grid (Step 10)
     };
 
     const generateOnePager = async () => {
@@ -537,7 +537,7 @@ export default function ProfileWizard() {
     // --- TRANSCRIPT HANDLERS ---
     const handleRefineStrategyWithTranscript = async () => {
         if (!transcriptStrategy.trim()) {
-            setStep(5);
+            setStep(6);
             return;
         }
         setIsProcessingTranscript(true);
@@ -571,7 +571,7 @@ export default function ProfileWizard() {
                 }
             }));
             setAiContext("Strategy refined from transcript.");
-            setStep(5); // Proceed to the Strategy Screen
+            setStep(6); // Proceed to the Strategy Screen (Step 6)
         } catch (e) {
             console.error(e);
             alert("Could not process transcript. Please try again or skip.");
@@ -582,7 +582,7 @@ export default function ProfileWizard() {
     const handleAutoFillSupportFromTranscript = async () => {
         if (!transcriptSupport.trim()) {
             setSupportStep(0);
-            setStep(8);
+            setStep(10);
             return;
         }
         setIsProcessingTranscript(true);
@@ -618,7 +618,7 @@ export default function ProfileWizard() {
 
             setAiContext("Support needs identified from transcript.");
             setSupportStep(0);
-            setStep(8);
+            setStep(10);
         } catch (e) {
             console.error(e);
             alert("Could not analyze transcript.");
@@ -729,13 +729,13 @@ export default function ProfileWizard() {
                 <div className="flex items-center gap-6">
                     <div className="flex flex-col items-end gap-1">
                         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                            Step {step} of 9
+                            Step {step} of 11
                         </div>
                         {/* Progress Bar */}
                         <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-gradient-to-r from-[#D32F2F] to-[#F57C00] transition-all duration-300 ease-out"
-                                style={{ width: `${(step / 9) * 100}%` }}
+                                style={{ width: `${(step / 11) * 100}%` }}
                             ></div>
                         </div>
                     </div>
@@ -1016,14 +1016,14 @@ export default function ProfileWizard() {
                             </button>
                         </div>
 
-                        <button key="next4" onClick={() => setStep(4.5)} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
+                        <button key="next4" onClick={() => setStep(5)} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
                             Proceed to Strategy
                         </button>
                     </StepContainer>
                 )}
 
-                {/* STEP 4.5: TRANSCRIPT UPLOAD (STRATEGY) */}
-                {step === 4.5 && (
+                {/* STEP 5: TRANSCRIPT UPLOAD (STRATEGY) */}
+                {step === 5 && (
                     <StepContainer title="Refine Strategy with Context" onBack={() => setStep(4)} aiContext={aiContext}>
                         <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100">
                             <div className="flex items-center gap-3 mb-4">
@@ -1046,7 +1046,7 @@ export default function ProfileWizard() {
 
                             <div className="flex gap-4 mt-6">
                                 <button
-                                    onClick={() => setStep(5)}
+                                    onClick={() => setStep(6)}
                                     className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-colors"
                                 >
                                     Skip & Fill Manually
@@ -1064,8 +1064,8 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 5: 4 DIMENSIONS */}
-                {step === 5 && (
+                {/* STEP 6: 4 DIMENSIONS (Was 5) */}
+                {step === 6 && (
                     <StepContainer title="Define Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-4">
                             <div className="flex justify-between items-center mb-4">
@@ -1155,8 +1155,8 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 6: REVENUE TARGET */}
-                {step === 6 && (
+                {/* STEP 7: REVENUE TARGET (Was 6) */}
+                {step === 7 && (
                     <StepContainer title="Target Revenue" onBack={handleBack} aiContext={aiContext}>
                         <div className="text-center mb-8">
                             <div className="inline-block p-4 bg-red-50 text-[#D32F2F] rounded-full mb-4">
@@ -1263,8 +1263,8 @@ export default function ProfileWizard() {
                 )}
 
 
-                {/* STEP 7: SHOW STRATEGY (REVIEW) */}
-                {step === 7 && (
+                {/* STEP 8: SHOW STRATEGY (REVIEW) (Was 7) */}
+                {step === 8 && (
                     <StepContainer title="Review Your Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-6">
                             {/* 1. HEADER CARD */}
@@ -1384,14 +1384,56 @@ export default function ProfileWizard() {
                             </div>
                         </div>
 
-                        <button onClick={() => setStep(7.5)} className="w-full mt-8 py-4 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-lg">
+                        <button onClick={() => setStep(9)} className="w-full mt-8 py-4 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-lg">
                             Looks Good, Continue <ArrowRight size={20} />
                         </button>
                     </StepContainer>
                 )}
 
-                {/* STEP 8: HELP NEEDED */}
-                {step === 8 && (
+                {/* STEP 9: TRANSCRIPT UPLOAD (SUPPORT) (Was 7.5) */}
+                {step === 9 && (
+                    <StepContainer title="Auto-Assess Support Needs" onBack={() => setStep(8)} aiContext={aiContext}>
+                        <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full">
+                                    <Mic size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900">Upload Meeting Transcript</h3>
+                                    <p className="text-sm text-gray-600">Provide a transcript or notes from your strategy meetings. AI will use this to auto-fill the support needs.</p>
+                                </div>
+                            </div>
+
+                            <textarea
+                                rows={8}
+                                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono text-sm"
+                                placeholder="Paste transcript here..."
+                                value={transcriptSupport}
+                                onChange={e => setTranscriptSupport(e.target.value)}
+                            />
+
+                            <div className="flex gap-4 mt-6">
+                                <button
+                                    onClick={() => setStep(10)}
+                                    className="flex-1 py-3 bg-white border border-gray-300 text-gray-600 font-bold rounded-xl hover:bg-gray-50 transition-colors"
+                                >
+                                    Skip & Fill Manually
+                                </button>
+                                <button
+                                    onClick={handleAnalyzeSupportNeeds}
+                                    disabled={!transcriptSupport}
+                                    className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {isProcessingSupport ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
+                                    Analyze with AI
+                                </button>
+                            </div>
+                        </div>
+                    </StepContainer>
+                )}
+
+                {/* STEP 10: HELP NEEDED (Was 8) */}
+                {step === 10 && (
                     <StepContainer title={`Support Assessment (${supportStep + 1}/2)`} onBack={handleSupportBack} aiContext={aiContext}>
                         <p className="text-gray-500 mb-6 text-sm">Select your execution model for each critical sub-area.</p>
 
@@ -1470,8 +1512,8 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 9: SUMMARY & SUBMIT */}
-                {step === 9 && (
+                {/* STEP 11: SUMMARY & SUBMIT (Was 9) */}
+                {step === 11 && (
                     <StepContainer title="Submission Dashboard" onBack={handleBack} aiContext={aiContext}>
                         <div className="space-y-8">
 
