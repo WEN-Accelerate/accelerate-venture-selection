@@ -347,12 +347,46 @@ export default function ProfileWizard() {
     // --- STEP 8: SUPPORT DETAILS ---
     // Reordered for 2-screen split: Screen 1 (Growth/Market) vs Screen 2 (Ops/Finance)
     const SUPPORT_SUB_DOMAINS = {
-        'Product': ['Market Fit', 'Feature Roadmap', 'Tech Stack', 'UI/UX Design', 'Quality QA'],
-        'Selling': ['Sales Scripting', 'Lead Generation', 'CRM Setup', 'Sales Training', 'Closing Strategies'],
-        'Placement': ['Channel Entry', 'Logistics Setup', 'E-commerce Ops', 'Retail Partnerships', 'Supply Chain'],
-        'Money': ['Fundraising', 'Valuation', 'Financial Modeling', 'Grant Strategy', 'Cash Flow'],
-        'People': ['Org Structure', 'Hiring Key Roles', 'ESOP Planning', 'Culture Building', 'Performance Mgmt'],
-        'Process': ['Legal / Compliance', 'Accounting Setup', 'Agile Implementation', 'KPI Dashboards', 'Ops Manuals']
+        'Getting More Customers & Sales': [
+            'Help to grow revenue',
+            'Find the right customers and markets',
+            'Improve sales process and conversions',
+            'Build dealers, distributors, or online channels',
+            'Get large customers, enterprises, or exports',
+            'Plan growth for new cities, products, or markets'
+        ],
+        'Improving Products / Services': [
+            'Help to sell better and stand out',
+            'Improve product or service quality',
+            'Decide right pricing and margins',
+            'Add new products or services',
+            'Meet certifications, standards, or compliance',
+            'Reduce cost and improve differentiation'
+        ],
+        'Running Operations Better': [
+            'Help to deliver smoothly and at lower cost',
+            'Fix processes and daily operations',
+            'Increase production or service capacity',
+            'Improve vendor and supply chain management',
+            'Use digital tools, ERP, CRM, automation',
+            'Reduce waste, delays, and rework'
+        ],
+        'Building the Right Team': [
+            'Help to build people and leadership',
+            'Define roles and organization structure',
+            'Hire the right people faster',
+            'Train managers and teams',
+            'Improve performance and accountability',
+            'Build second-line leadership'
+        ],
+        'Managing Money & Business Control': [
+            'Help to stay financially strong and ready to scale',
+            'Plan finances and budgets',
+            'Improve cash flow and working capital',
+            'Get loans, funding, or investors',
+            'Handle compliance, risks, and governance',
+            'Track numbers using simple dashboards'
+        ]
     };
 
     const handleSupportDetailChange = (category, subItem, value) => {
@@ -1446,12 +1480,11 @@ export default function ProfileWizard() {
                                         <div className="flex justify-between items-start mb-6">
                                             <h3 className="text-xl font-black text-gray-900 tracking-tight">{category} Support</h3>
                                             <div className="p-2 bg-red-50 text-red-600 rounded-xl">
-                                                {category === 'Product' && <Target size={18} />}
-                                                {category === 'Money' && <DollarSign size={18} />}
-                                                {category === 'Placement' && <Globe size={18} />}
-                                                {category === 'Selling' && <Sparkles size={18} />}
-                                                {category === 'People' && <Users size={18} />}
-                                                {category === 'Process' && <Building2 size={18} />}
+                                                {category.includes('Products') && <Target size={18} />}
+                                                {category.includes('Money') && <DollarSign size={18} />}
+                                                {category.includes('Customers') && <Globe size={18} />}
+                                                {category.includes('Team') && <Users size={18} />}
+                                                {category.includes('Operations') && <Building2 size={18} />}
                                             </div>
                                         </div>
 
