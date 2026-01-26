@@ -222,13 +222,10 @@ function ClientCard({ client }) {
         >
             <div className="flex justify-between items-start mb-6">
                 <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 p-1 flex items-center justify-center overflow-hidden shadow-sm">
-                    {data.logo ? (
-                        <img src={data.logo} alt="Logo" className="w-full h-full object-contain" />
-                    ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-lg rounded-lg">
-                            {data.companyName?.charAt(0) || 'C'}
-                        </div>
-                    )}
+                    {/* Always show initial on cards as per request, ignoring logo if present for consistency */}
+                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-lg rounded-lg">
+                        {data.companyName?.charAt(0) || 'C'}
+                    </div>
                 </div>
                 <div className="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                     {stage === 'Domestic' ? 'Scaling' : 'Researching'}

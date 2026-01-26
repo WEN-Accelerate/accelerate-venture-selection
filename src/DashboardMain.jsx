@@ -512,12 +512,14 @@ export default function DashboardMain() {
                                     <p className="text-white/80 text-sm">Review your expansion roadmap before proceeding.</p>
                                 </div>
                                 {profile.logo ? (
-                                    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100">
-                                        <img src={profile.logo} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 h-20 w-20 flex items-center justify-center">
+                                        <img src={profile.logo} alt="Company Logo" className="w-full h-full object-contain" />
                                     </div>
                                 ) : (
-                                    <div className="h-16 w-16 bg-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-400">
-                                        {profile.companyName?.charAt(0) || 'C'}
+                                    <div className="h-20 w-20 rounded-xl bg-white p-1 shadow-sm border border-gray-100 flex items-center justify-center">
+                                        <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-3xl rounded-lg">
+                                            {profile.companyName?.charAt(0) || 'C'}
+                                        </div>
                                     </div>
                                 )}
                             </div>
