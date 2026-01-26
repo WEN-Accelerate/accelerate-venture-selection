@@ -459,15 +459,18 @@ export default function App() {
               .maybeSingle();
 
             if (consultantData) {
+              console.log("Verified Consultant found via email:", user.email);
               if (viewClientId) {
                 console.log("Consultant viewing specific client. Redirecting to Dashboard...");
                 window.location.href = `/dashboard.html?view_client_id=${viewClientId}`;
                 return;
               } else {
-                console.log("User is a consultant. Redirecting to Advisor Portal...");
+                console.log("Redirecting to Advisor Portal...");
                 window.location.href = '/consultant.html';
                 return;
               }
+            } else {
+              console.log("User is not a registered consultant:", user.email);
             }
           }
 

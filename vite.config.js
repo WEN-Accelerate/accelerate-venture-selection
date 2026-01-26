@@ -12,6 +12,7 @@ export default defineConfig({
                 profile: resolve(__dirname, 'profile.html'),
                 dashboard: resolve(__dirname, 'dashboard.html'),
                 consultant: resolve(__dirname, 'consultant.html'),
+                consultant_onboarding: resolve(__dirname, 'consultant-onboarding.html'),
             },
         },
     },
