@@ -13,6 +13,7 @@ export default defineConfig({
                 dashboard: resolve(__dirname, 'dashboard.html'),
                 consultant: resolve(__dirname, 'consultant.html'),
                 consultant_onboarding: resolve(__dirname, 'consultant-onboarding.html'),
+                admin: resolve(__dirname, 'admin.html'),
             },
         },
     },
