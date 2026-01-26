@@ -15,6 +15,7 @@ export default function ConsultantDashboard() {
     const [loading, setLoading] = useState(true);
     const [clients, setClients] = useState([]);
     const [consultantProfile, setConsultantProfile] = useState(null);
+    const [filterHub, setFilterHub] = useState('All');
 
     // --- AUTH ---
     useEffect(() => {
@@ -141,12 +142,26 @@ export default function ConsultantDashboard() {
                         <h1 className="text-3xl font-black text-gray-900 mb-2">Portfolio Management</h1>
                         <p className="text-gray-500 italic">Active Advisory: <span className="font-bold text-gray-900 not-italic">{clients.length} Companies</span></p>
                     </div>
-                    <button
-                        onClick={handleAddCompany}
-                        className="flex items-center gap-2 bg-[#D32F2F] text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-red-200 hover:bg-red-800 hover:shadow-xl hover:-translate-y-0.5 transition-all"
-                    >
-                        <PlusCircle size={20} /> Add New Company
-                    </button>
+                    <div className="flex gap-4">
+                        <select
+                            value={filterHub}
+                            onChange={(e) => setFilterHub(e.target.value)}
+                            className="bg-white border border-gray-200 text-gray-700 px-4 py-3 rounded-xl font-bold outline-none focus:border-red-500"
+                        >
+                            <option value="All">All Hubs</option>
+                            <option value="Ahmedabad">Ahmedabad</option>
+                            <option value="Pune">Pune</option>
+                            <option value="Chennai">Chennai</option>
+                            <option value="Bengaluru">Bengaluru</option>
+                            <option value="Lucknow">Lucknow</option>
+                        </select>
+                        <button
+                            onClick={handleAddCompany}
+                            className="flex items-center gap-2 bg-[#D32F2F] text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-red-200 hover:bg-red-800 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                        >
+                            <PlusCircle size={20} /> Add New Company
+                        </button>
+                    </div>
                 </div>
 
                 {/* GRID */}
@@ -166,9 +181,11 @@ export default function ConsultantDashboard() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {clients.map(client => (
-                            <ClientCard key={client.id} client={client} />
-                        ))}
+                        {clients
+                            .filter(client => filterHub === 'All' || (client.details?.hub === filterHub))
+                            .map(client => (
+                                <ClientCard key={client.id} client={client} />
+                            ))}
                     </div>
                 )}
 
@@ -197,9 +214,15 @@ function ClientCard({ client }) {
             className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all group cursor-pointer relative overflow-hidden"
         >
             <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black text-xl">
-                    {data.companyName?.charAt(0) || 'C'}
-                </div>
+                {data.logo ? (
+                    <div className="w-12 h-12 rounded-xl bg-white border border-gray-100 p-1 flex items-center justify-center overflow-hidden">
+                        <img src={data.logo} alt="Logo" className="w-full h-full object-contain" />
+                    </div>
+                ) : (
+                    <div className="w-12 h-12 rounded-xl bg-gray-900 text-white flex items-center justify-center font-black text-xl">
+                        {data.companyName?.charAt(0) || 'C'}
+                    </div>
+                )}
                 <div className="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                     {stage === 'Domestic' ? 'Scaling' : 'Researching'}
                 </div>

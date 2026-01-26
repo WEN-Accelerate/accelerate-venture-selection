@@ -495,9 +495,13 @@ export default function DashboardMain() {
                                     <h2 className="text-3xl font-bold text-white mb-2">{profile.companyName}</h2>
                                     <p className="text-white/80 text-sm">Review your expansion roadmap before proceeding.</p>
                                 </div>
-                                {profile.logoUrl && (
-                                    <div className="hidden md:block bg-white p-2 rounded-lg shadow-lg">
-                                        <img src={profile.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                {profile.logo ? (
+                                    <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+                                        <img src={profile.logo} alt="Company Logo" className="h-16 w-auto object-contain max-w-[120px]" />
+                                    </div>
+                                ) : (
+                                    <div className="h-16 w-16 bg-gray-100 rounded-xl flex items-center justify-center text-2xl font-bold text-gray-400">
+                                        {profile.companyName?.charAt(0) || 'C'}
                                     </div>
                                 )}
                             </div>
@@ -522,6 +526,10 @@ export default function DashboardMain() {
                                 <div>
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Key Personnel</label>
                                     <div className="font-semibold text-gray-900">{profile.keyPersonnel || '-'}</div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Company Hub</label>
+                                    <div className="font-semibold text-gray-900">{profile.hub || 'Not Assigned'}</div>
                                 </div>
                             </div>
 
