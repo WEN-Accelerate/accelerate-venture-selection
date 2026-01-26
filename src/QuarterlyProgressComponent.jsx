@@ -17,6 +17,7 @@ export default function QuarterlyProgress({ profileId, isConsultant }) {
         revenue_actual: '',
         jobs_actual: '',
         strategy_status: 'Green',
+        sprint_status: 'Green',
         sprint_milestones_text: '',
         commitment_signals: ''
     });
@@ -98,6 +99,7 @@ export default function QuarterlyProgress({ profileId, isConsultant }) {
                                 revenue_actual: '',
                                 jobs_actual: '',
                                 strategy_status: 'Green',
+                                sprint_status: 'Green',
                                 sprint_milestones_text: '',
                                 commitment_signals: ''
                             });
@@ -133,11 +135,19 @@ export default function QuarterlyProgress({ profileId, isConsultant }) {
                         <div className="p-6">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-xl text-gray-900">{data.quarter_label}</h3>
-                                <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${data.strategy_status === 'Red' ? 'bg-red-100 text-red-700' :
-                                    data.strategy_status === 'Amber' ? 'bg-orange-100 text-orange-700' :
-                                        'bg-emerald-100 text-emerald-700'
-                                    }`}>
-                                    {data.strategy_status}
+                                <div className="flex flex-col gap-1 items-end">
+                                    <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider w-fit ${data.strategy_status === 'Red' ? 'bg-red-100 text-red-700' :
+                                            data.strategy_status === 'Amber' ? 'bg-orange-100 text-orange-700' :
+                                                'bg-emerald-100 text-emerald-700'
+                                        }`}>
+                                        Strategy: {data.strategy_status}
+                                    </div>
+                                    <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider w-fit ${(data.sprint_status || 'Green') === 'Red' ? 'bg-red-100 text-red-700' :
+                                            (data.sprint_status || 'Green') === 'Amber' ? 'bg-orange-100 text-orange-700' :
+                                                'bg-emerald-100 text-emerald-700'
+                                        }`}>
+                                        Sprint: {data.sprint_status || 'Green'}
+                                    </div>
                                 </div>
                             </div>
 
@@ -192,13 +202,31 @@ export default function QuarterlyProgress({ profileId, isConsultant }) {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Strategy Status</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Strategy & Expansion Status</label>
                                 <div className="grid grid-cols-3 gap-3">
                                     {[{ val: 'Green', label: 'Green (On Track)' }, { val: 'Amber', label: 'Amber (Late)' }, { val: 'Red', label: 'Red (Off Track)' }].map(status => (
                                         <button
                                             key={status.val}
                                             onClick={() => setFormData({ ...formData, strategy_status: status.val })}
                                             className={`py-2 rounded-lg font-bold text-xs border-2 transition-all ${formData.strategy_status === status.val
+                                                ? (status.val === 'Green' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : status.val === 'Amber' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-red-500 bg-red-50 text-red-700')
+                                                : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'
+                                                }`}
+                                        >
+                                            {status.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Sprint Status</label>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {[{ val: 'Green', label: 'Green (On Track)' }, { val: 'Amber', label: 'Amber (Late)' }, { val: 'Red', label: 'Red (Off Track)' }].map(status => (
+                                        <button
+                                            key={status.val}
+                                            onClick={() => setFormData({ ...formData, sprint_status: status.val })}
+                                            className={`py-2 rounded-lg font-bold text-xs border-2 transition-all ${formData.sprint_status === status.val
                                                 ? (status.val === 'Green' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : status.val === 'Amber' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-red-500 bg-red-50 text-red-700')
                                                 : 'border-transparent bg-gray-50 text-gray-400 hover:bg-gray-100'
                                                 }`}
