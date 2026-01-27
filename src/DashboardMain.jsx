@@ -6,7 +6,7 @@ import {
     BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
     Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid, BarChart3
 } from 'lucide-react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import QuarterlyProgress from './QuarterlyProgressComponent';
 
 // --- CONFIG ---
@@ -962,8 +962,7 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 setAiLoading(false);
                 return;
             }
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            const ai = new GoogleGenAI({ apiKey });
 
             const prompt = `
                 Act as a Strategy Consultant for ${profile.companyName || 'a company'} (Industry: ${profile.industry || 'Unknown'}).
@@ -997,9 +996,17 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 Return JSON only.
             `;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
+            const result = await ai.models.generateContent({
+                model: "gemini-2.0-flash-exp",
+                contents: prompt
+            });
+
+            // Handle response based on SDK version variability
+            let text = result.text;
+            if (typeof text === 'function') text = text();
+            if (!text && result.candidates && result.candidates[0]) {
+                text = result.candidates[0].content.parts[0].text;
+            }
 
             // Loose JSON parsing
             const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();

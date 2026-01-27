@@ -32,6 +32,11 @@ export default function AdminDashboard() {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteName, setInviteName] = useState('');
 
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [selectedConsultant, setSelectedConsultant] = useState(null);
+    const [assignCompanyId, setAssignCompanyId] = useState('');
+    const [assignments, setAssignments] = useState([]);
+
     useEffect(() => {
         netlifyIdentity.init();
         const u = netlifyIdentity.currentUser();
@@ -64,7 +69,11 @@ export default function AdminDashboard() {
         const { data: prog } = await supabase.from('quarterly_progress').select('*');
         setQuarterlyProgress(prog || []);
 
-        // 4. Calc Stats
+        // 4. Fetch Assignments
+        const { data: assigns } = await supabase.from('consultant_clients').select('*');
+        setAssignments(assigns || []);
+
+        // 5. Calc Stats
         const totalRev = (profs || []).reduce((acc, p) => acc + (parseFloat(p.details?.revenue) || 0), 0);
         const hubs = new Set((profs || []).map(p => p.details?.hub)).size;
 
@@ -162,17 +171,29 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    const handleAssignConsultant = async (consultantEmail, companyId) => {
-        const clientProfileId = companyId || prompt("Enter Client Profile ID to assign (copy from list):");
-        if (!clientProfileId) return;
+    const handleOpenAssignModal = (consultant) => {
+        setSelectedConsultant(consultant);
+        setAssignCompanyId('');
+        setIsAssignModalOpen(true);
+    };
 
-        const { error } = await supabase.from('consultant_clients').insert({
-            consultant_email: consultantEmail,
-            client_profile_id: clientProfileId
-        });
+    const handleAssignConsultant = async () => {
+        if (!selectedConsultant || !assignCompanyId) return;
 
-        if (error) alert("Error assigning: " + error.message);
-        else alert("Assigned successfully.");
+        try {
+            const { error } = await supabase.from('consultant_clients').insert({
+                consultant_email: selectedConsultant.email,
+                client_profile_id: assignCompanyId
+            });
+
+            if (error) throw error;
+
+            alert("Company assigned successfully!");
+            setIsAssignModalOpen(false);
+            fetchData();
+        } catch (e) {
+            alert("Error assigning company: " + e.message);
+        }
     };
 
     // --- RENDERERS ---
@@ -311,31 +332,40 @@ export default function AdminDashboard() {
                                             <th className="px-6 py-4">Name</th>
                                             <th className="px-6 py-4">Email</th>
                                             <th className="px-6 py-4">Focus Areas</th>
+                                            <th className="px-6 py-4">Assigned Companies</th>
                                             <th className="px-6 py-4">Status</th>
                                             <th className="px-6 py-4">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-50">
-                                        {consultants.map(c => (
-                                            <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 font-bold text-gray-900">{c.name || 'Unknown'}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{c.email}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">
-                                                    <span className="truncate max-w-[150px] block">{c.industry_focus || '-'}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Active</span>
-                                                </td>
-                                                <td className="px-6 py-4 flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => handleAssignConsultant(c.email)}
-                                                        className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
-                                                    >
-                                                        Assign to Client
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {consultants.map(c => {
+                                            const count = assignments.filter(a => a.consultant_email === c.email).length;
+                                            return (
+                                                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-gray-900">{c.name || 'Unknown'}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{c.email}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">
+                                                        <span className="truncate max-w-[150px] block">{c.industry_focus || '-'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                                                        <span className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-lg">
+                                                            {count} Companies
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Active</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => handleOpenAssignModal(c)}
+                                                            className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors"
+                                                        >
+                                                            Assign Client
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -385,8 +415,8 @@ export default function AdminDashboard() {
                                                     <td className="px-6 py-4 text-sm text-gray-600 font-medium">Q1 2025</td>
                                                     <td className="px-6 py-4">
                                                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 w-fit ${status === 'Green' ? 'bg-emerald-100 text-emerald-700' :
-                                                                status === 'Amber' ? 'bg-orange-100 text-orange-700' :
-                                                                    status === 'Red' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'
+                                                            status === 'Amber' ? 'bg-orange-100 text-orange-700' :
+                                                                status === 'Red' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'
                                                             }`}>
                                                             {status === 'Green' ? <CheckCircle size={10} /> : status === 'Red' ? <AlertCircle size={10} /> : null}
                                                             {status}
@@ -477,6 +507,52 @@ export default function AdminDashboard() {
                         <div className="flex justify-end gap-3">
                             <button onClick={() => setIsCompanyModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
                             <button onClick={handleSaveCompany} className="px-6 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200">Save Profile</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Modal */}
+            {isAssignModalOpen && selectedConsultant && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Assign Company</h3>
+                        <p className="text-sm text-gray-500 mb-6">Assign a client to <strong>{selectedConsultant.name}</strong> ({selectedConsultant.email})</p>
+
+                        <div className="space-y-4 mb-8">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Select Company</label>
+                                <select
+                                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={assignCompanyId}
+                                    onChange={e => setAssignCompanyId(e.target.value)}
+                                >
+                                    <option value="">Choose a company...</option>
+                                    {profiles.map(p => {
+                                        // Check if already assigned to this consultant
+                                        const isAssigned = assignments.some(a =>
+                                            a.consultant_email === selectedConsultant.email &&
+                                            a.client_profile_id === p.user_id
+                                        );
+                                        return (
+                                            <option key={p.id} value={p.user_id} disabled={isAssigned}>
+                                                {p.details?.companyName || 'Untitled'} {isAssigned ? '(Already Assigned)' : ''}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setIsAssignModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
+                            <button
+                                onClick={handleAssignConsultant}
+                                disabled={!assignCompanyId}
+                                className={`px-6 py-2.5 rounded-xl font-bold text-white flex items-center gap-2 shadow-lg ${!assignCompanyId ? 'bg-gray-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'}`}
+                            >
+                                <CheckCircle size={16} /> Assign
+                            </button>
                         </div>
                     </div>
                 </div>
