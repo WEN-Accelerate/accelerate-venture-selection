@@ -119,9 +119,7 @@
         console.log('🔧 URL:', SUPABASE_URL);
         console.log('🔧 Key:', SUPABASE_KEY.substring(0, 20) + '...');
 
-        const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
-            auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-        });
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         console.log('✅ Supabase client created');
 
         async function testConnection() {
