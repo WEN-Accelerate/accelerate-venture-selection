@@ -1,23 +1,68 @@
 /**
- * AI Service - Robust Gemini API Integration
+ * AI Service - Auto-discovering Gemini API Integration
  * 
- * CRITICAL FIX: Using v1 (stable) API instead of v1beta which causes 404s
- * The @google/generative-ai SDK defaults to v1beta, but gemini models aren't available there.
- * 
- * This service bypasses the SDK entirely and uses direct REST calls to the v1 API.
+ * CRITICAL DISCOVERY: The API key doesn't have access to standard model names.
+ * This service will auto-discover available models and use them dynamically.
  */
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
+// Cache for discovered models
+let discoveredModels = null;
+
 /**
- * reliableGenerateContent - Direct REST API calls with multiple model fallbacks
- * 
- * Strategy:
- * 1. Try gemini-1.5-flash via v1 REST API (Fast, widely available)
- * 2. Try gemini-1.5-pro via v1 REST API (More capable)
- * 3. Try gemini-pro via v1 REST API (Legacy stable)
- * 
- * Each attempt uses the stable v1 endpoint, NOT v1beta which causes 404s.
+ * Discover available models by calling the ListModels API
+ */
+const discoverModels = async () => {
+    if (discoveredModels) return discoveredModels;
+
+    try {
+        console.log("AI Service: Discovering available models...");
+
+        // Try both v1 and v1beta endpoints
+        const endpoints = [
+            `https://generativelanguage.googleapis.com/v1/models?key=${API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`
+        ];
+
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint);
+                if (!response.ok) continue;
+
+                const data = await response.json();
+                const models = data.models || [];
+
+                // Filter for models that support generateContent
+                const contentModels = models
+                    .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+                    .map(m => ({
+                        name: m.name.replace('models/', ''),
+                        fullName: m.name,
+                        version: endpoint.includes('v1beta') ? 'v1beta' : 'v1'
+                    }));
+
+                if (contentModels.length > 0) {
+                    console.log("AI Service: Discovered models:", contentModels);
+                    discoveredModels = contentModels;
+                    return contentModels;
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+
+        console.warn("AI Service: Could not discover any models");
+        return [];
+
+    } catch (error) {
+        console.error("AI Service: Discovery failed:", error);
+        return [];
+    }
+};
+
+/**
+ * reliableGenerateContent - Auto-discovers and uses available models
  */
 export const reliableGenerateContent = async (prompt) => {
     if (!API_KEY) {
@@ -25,15 +70,20 @@ export const reliableGenerateContent = async (prompt) => {
         return null;
     }
 
-    // Model list in order of preference
-    const models = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"];
+    // Discover available models first
+    const models = await discoverModels();
 
-    for (const modelName of models) {
+    if (models.length === 0) {
+        console.error("AI Service: No models available with this API key");
+        throw new Error("No AI models available. Please check your API key permissions.");
+    }
+
+    // Try each discovered model
+    for (const model of models) {
         try {
-            console.log(`AI Service: Attempting ${modelName} via v1 REST API...`);
+            console.log(`AI Service: Attempting ${model.name} via ${model.version}...`);
 
-            // CRITICAL: Use v1 (stable) NOT v1beta
-            const url = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${API_KEY}`;
+            const url = `https://generativelanguage.googleapis.com/${model.version}/${model.fullName}:generateContent?key=${API_KEY}`;
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -47,7 +97,7 @@ export const reliableGenerateContent = async (prompt) => {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.warn(`AI Service: ${modelName} failed (${response.status}):`, errorText);
+                console.warn(`AI Service: ${model.name} failed (${response.status}):`, errorText);
                 continue; // Try next model
             }
 
@@ -55,22 +105,22 @@ export const reliableGenerateContent = async (prompt) => {
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
             if (text) {
-                console.log(`AI Service: Success with ${modelName}`);
+                console.log(`AI Service: ✓ Success with ${model.name}`);
                 return text;
             }
 
-            console.warn(`AI Service: ${modelName} returned empty response`);
+            console.warn(`AI Service: ${model.name} returned empty response`);
             continue;
 
         } catch (error) {
-            console.warn(`AI Service: ${modelName} exception:`, error);
+            console.warn(`AI Service: ${model.name} exception:`, error);
             continue; // Try next model
         }
     }
 
     // All models failed
-    console.error("AI Service: All models exhausted.");
-    throw new Error("AI Generation Failed: All models returned errors.");
+    console.error("AI Service: All discovered models failed.");
+    throw new Error("AI Generation Failed: All available models returned errors.");
 };
 
 /**
