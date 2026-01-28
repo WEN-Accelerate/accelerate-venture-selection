@@ -239,7 +239,7 @@ export default function ProfileWizard() {
             If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
             const response = await ai.models.generateContent({
-                model: "gemini-2.0-flash-exp",
+                model: "gemini-2.0-pro-exp-02-05",
                 contents: prompt,
                 config: {
                     tools: [{ googleSearch: {} }],
@@ -284,7 +284,7 @@ export default function ProfileWizard() {
                 Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
 
                 const response = await ai.models.generateContent({
-                    model: "gemini-1.5-flash",
+                    model: "gemini-2.0-pro-exp-02-05",
                     contents: fallbackPrompt
                 });
 
