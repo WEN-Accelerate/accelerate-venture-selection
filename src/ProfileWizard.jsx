@@ -203,7 +203,10 @@ export default function ProfileWizard() {
             }
             If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
-            const rawText = await reliableGenerateContent(prompt);
+            // CRITICAL: Enable web search for accurate company research
+            const rawText = await reliableGenerateContent(prompt, {
+                useSearch: true  // Enable web search grounding for factual data
+            });
 
             if (!rawText) throw new Error("Empty response from AI");
 

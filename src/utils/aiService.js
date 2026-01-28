@@ -10,12 +10,13 @@
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Simplified model list - Using Gemini 3 Flash for speed + accuracy
-// Primary: gemini-3-flash-preview (fast and capable)
-// Backup: gemini-pro-latest (proven working fallback)
+// Dual-model strategy for optimal performance
+// - Fast model (gemini-2.5-flash) for general tasks WITHOUT web search
+// - Research model (gemini-3-flash-preview) for company profiles WITH web search
 const MODELS = [
-    { name: 'gemini-3-flash-preview', version: 'v1beta', rank: 100 },  // Fast + Accurate (Gemini 3.0)
-    { name: 'gemini-pro-latest', version: 'v1beta', rank: 90 },        // Fallback
+    { name: 'gemini-2.5-flash', version: 'v1beta', rank: 100, fast: true },        // Primary: Fast, no web search needed
+    { name: 'gemini-3-flash-preview', version: 'v1beta', rank: 90, search: true }, // Fallback: With web search
+    { name: 'gemini-pro-latest', version: 'v1beta', rank: 80 },                   // Emergency fallback
 ];
 
 // Blocklist for rate-limited or failed models (clears after 5 minutes)
@@ -187,11 +188,18 @@ export const reliableGenerateContent = async (prompt, options = {}) => {
 
     console.log(`📋 AI Service: Trying ${availableModels.length} models: ${availableModels.map(m => m.name).join(', ')}`);
 
-    // Enable web search by default for accurate, factual responses
+    // Web search is OPTIONAL - only enable when explicitly requested
+    // Default: OFF for speed, enable for company research
     const callOptions = {
-        useSearch: options.useSearch !== false, // Default: enabled
+        useSearch: options.useSearch === true, // Default: disabled (fast)
         responseSchema: options.responseSchema  // Optional JSON schema
     };
+
+    if (callOptions.useSearch) {
+        console.log(`🔍 Web search grounding will be enabled for accuracy`);
+    } else {
+        console.log(`⚡ Fast mode: Web search disabled`);
+    }
 
     // Try each available model
     for (const model of availableModels) {
