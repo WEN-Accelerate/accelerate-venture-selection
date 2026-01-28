@@ -5,7 +5,7 @@ import {
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
     Mic, MessageSquare, Send, Info, X, LogOut
 } from 'lucide-react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 import netlifyIdentity from 'netlify-identity-widget';
 
@@ -28,53 +28,24 @@ const BRAND_COLORS = {
 };
 
 // --- AI HELPER ---
-const validateModel = async (apiKey, preference = 'speed') => {
-    try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-        if (!response.ok) return "gemini-1.5-flash"; // Fallback
-        const data = await response.json();
-        const models = data.models || [];
-
-        if (preference === 'accuracy') {
-            // Priority: 1.5 Pro -> Pro -> Flash
-            const pro15 = models.find(m => m.name.includes('gemini-1.5-pro') && m.supportedGenerationMethods?.includes('generateContent'));
-            if (pro15) return pro15.name.replace('models/', '');
-
-            const pro = models.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods?.includes('generateContent'));
-            if (pro) return pro.name.replace('models/', '');
-        }
-
-        // Prefer Flash, then Pro, then any gemini
-        const flash = models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent'));
-        if (flash) return flash.name.replace('models/', '');
-
-        const pro = models.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods?.includes('generateContent'));
-        if (pro) return pro.name.replace('models/', '');
-
-        const anyGemini = models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
-        if (anyGemini) return anyGemini.name.replace('models/', '');
-
-        return "gemini-1.5-flash";
-    } catch (e) {
-        console.error("Model validation failed", e);
-        return "gemini-1.5-flash";
-    }
-};
-
 const callGemini = async (prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+    const model = "gemini-2.0-pro-exp-02-05";
+
     if (!apiKey) return "AI simulation: Gemini response placeholder.";
 
     try {
-        const modelName = await validateModel(apiKey);
-        console.log("Using Model:", modelName);
-
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: modelName });
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return response.text();
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            }
+        );
+        if (!response.ok) throw new Error('Gemini API Error');
+        const data = await response.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
     } catch (error) {
         console.error("Gemini Error:", error);
         return "AI Error: Could not generate response.";
@@ -163,22 +134,6 @@ export default function ProfileWizard() {
             setConsultantMode(true);
             console.log("Consultant Mode Active: Adding Client Profile");
         }
-
-        // DEBUG: Check available models
-        const debugModels = async () => {
-            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-            if (apiKey) {
-                try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-                    const data = await response.json();
-                    console.log("AVAILABLE MODELS JSON:", JSON.stringify(data, null, 2));
-                } catch (e) {
-                    console.error("Failed to list models", e);
-                }
-            }
-        };
-        debugModels();
-
     }, []);
 
     // Chat State
@@ -251,6 +206,7 @@ export default function ProfileWizard() {
         if (!profile.companyName) return;
         setLoading(true);
         const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+        const ai = new GoogleGenAI({ apiKey });
 
         // Helper to parse loose JSON
         const parseLooseJson = (text) => {
@@ -264,12 +220,8 @@ export default function ProfileWizard() {
         };
 
         try {
-            // User requested "deep research" / accuracy for scraping
-            const modelName = await validateModel(apiKey, 'accuracy');
-            console.log(`Attempting Analysis with ${modelName}...`);
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: modelName });
-
+            console.log("Attempting Deep Search with gemini-2.0-flash-exp...");
+            // ATTEMPT 1: Deep Search with gemini-2.0-flash-exp
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:
             {
@@ -284,15 +236,30 @@ export default function ProfileWizard() {
                 "marketPosition": "Current standing",
                 "employees": "Estimated count (e.g. 100-500)"
             }
-            If specific data is not found, make a best guess based on general knowledge. Return ONLY JSON.`;
+            If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const rawText = response.text();
+            const response = await ai.models.generateContent({
+                model: "gemini-2.0-flash-exp",
+                contents: prompt,
+                config: {
+                    tools: [{ googleSearch: {} }],
+                    // Relaxed schema: we parse manually to avoid validation errors on partial data
+                }
+            });
 
-            console.log("Analysis Response:", rawText);
+            // Handle response
+            let rawText = response.text;
+            if (typeof rawText === 'function') rawText = rawText();
+            if (!rawText) throw new Error("Empty response from Search model");
+
+            console.log("Search Response:", rawText);
             const data = parseLooseJson(rawText);
 
+            if (!data.name && !data.industry) {
+                throw new Error("Search returned not useful data");
+            }
+
+            // Success Update
             setProfile(prev => ({
                 ...prev,
                 companyName: data.name || prev.companyName,
@@ -305,13 +272,43 @@ export default function ProfileWizard() {
                 keyPersonnel: Array.isArray(data.promoters) ? data.promoters.join(", ") : (data.promoters || ""),
                 growthLead: (Array.isArray(data.promoters) && data.promoters.length > 0) ? data.promoters[0] : prev.growthLead
             }));
-            setAiContext(`Analyzed ${data.name}.`);
+            setAiContext(`Analyzed ${data.name}. Source: Deep Search.`);
             setStep(2);
 
         } catch (error) {
-            console.error("AI Analysis Failed", error);
-            setAiContext("Could not auto-analyze. Please fill manually.");
-            setStep(2);
+            console.warn("Deep Search Failed, falling back to Internal Knowledge...", error);
+
+            try {
+                // ATTEMPT 2: Fallback to gemini-1.5-flash (Internal Knowledge)
+                const fallbackPrompt = `Act as a business analyst. Analyze company "${profile.companyName}".
+                Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
+
+                const response = await ai.models.generateContent({
+                    model: "gemini-1.5-flash",
+                    contents: fallbackPrompt
+                });
+
+                let rawText = response.text;
+                if (typeof rawText === 'function') rawText = rawText();
+                const data = parseLooseJson(rawText || "{}");
+
+                setProfile(prev => ({
+                    ...prev,
+                    companyName: data.name || prev.companyName,
+                    industry: data.industry || "",
+                    products: Array.isArray(data.products) ? data.products.join(", ") : (data.products || ""),
+                    customers: Array.isArray(data.customers) ? data.customers.join(", ") : (data.customers || ""),
+                    employees: data.employees || "",
+                    keyPersonnel: Array.isArray(data.promoters) ? data.promoters.join(", ") : (data.promoters || ""),
+                }));
+                setAiContext(`Analyzed ${profile.companyName} using Internal Knowledge.`);
+                setStep(2);
+
+            } catch (finalError) {
+                console.error("All AI attempts failed", finalError);
+                setAiContext("Could not auto-analyze. Please fill manually.");
+                setStep(2);
+            }
         }
         setLoading(false);
     };
