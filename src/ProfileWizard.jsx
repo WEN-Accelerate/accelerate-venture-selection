@@ -5,7 +5,7 @@ import {
     Target, Globe, CheckCircle, ChevronRight, Loader2, Save,
     Mic, MessageSquare, Send, Info, X, LogOut
 } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import netlifyIdentity from 'netlify-identity-widget';
 
@@ -28,24 +28,19 @@ const BRAND_COLORS = {
 };
 
 // --- AI HELPER ---
+// --- AI HELPER ---
 const callGemini = async (prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-    const model = "gemini-2.0-flash-exp";
 
     if (!apiKey) return "AI simulation: Gemini response placeholder.";
 
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            }
-        );
-        if (!response.ok) throw new Error('Gemini API Error');
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
     } catch (error) {
         console.error("Gemini Error:", error);
         return "AI Error: Could not generate response.";
@@ -206,7 +201,7 @@ export default function ProfileWizard() {
         if (!profile.companyName) return;
         setLoading(true);
         const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-        const ai = new GoogleGenAI({ apiKey });
+        const genAI = new GoogleGenerativeAI(apiKey);
 
         // Helper to parse loose JSON
         const parseLooseJson = (text) => {
@@ -220,8 +215,8 @@ export default function ProfileWizard() {
         };
 
         try {
-            console.log("Attempting Deep Search with gemini-2.0-flash-exp...");
-            // ATTEMPT 1: Deep Search with gemini-2.0-flash-exp
+            console.log("Attempting Deep Search with gemini-1.5-pro...");
+            // ATTEMPT 1: Deep Search with gemini-1.5-pro (Best for reasoning/accuracy)
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:
             {
@@ -238,18 +233,12 @@ export default function ProfileWizard() {
             }
             If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
-            const response = await ai.models.generateContent({
-                model: "gemini-2.0-flash-exp",
-                contents: prompt,
-                config: {
-                    tools: [{ googleSearch: {} }],
-                    // Relaxed schema: we parse manually to avoid validation errors on partial data
-                }
-            });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
 
             // Handle response
-            let rawText = response.text;
-            if (typeof rawText === 'function') rawText = rawText();
+            let rawText = response.text();
             if (!rawText) throw new Error("Empty response from Search model");
 
             console.log("Search Response:", rawText);
@@ -283,13 +272,11 @@ export default function ProfileWizard() {
                 const fallbackPrompt = `Act as a business analyst. Analyze company "${profile.companyName}".
                 Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
 
-                const response = await ai.models.generateContent({
-                    model: "gemini-1.5-flash",
-                    contents: fallbackPrompt
-                });
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const result = await model.generateContent(fallbackPrompt);
+                const response = await result.response;
 
-                let rawText = response.text;
-                if (typeof rawText === 'function') rawText = rawText();
+                let rawText = response.text();
                 const data = parseLooseJson(rawText || "{}");
 
                 setProfile(prev => ({
