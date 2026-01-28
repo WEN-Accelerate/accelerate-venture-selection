@@ -15,6 +15,8 @@ export default defineConfig({
                 consultant_onboarding: resolve(__dirname, 'consultant-onboarding.html'),
                 admin: resolve(__dirname, 'admin.html'),
                 ai_admin: resolve(__dirname, 'ai-admin.html'),
+                test_admin: resolve(__dirname, 'test-admin.html'),
+                diagnostic: resolve(__dirname, 'diagnostic.html'),
             },
         },
     },
