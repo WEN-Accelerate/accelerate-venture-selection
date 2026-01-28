@@ -10,12 +10,12 @@
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Simplified model list - Using Gemini 3 Pro for best accuracy
-// Primary: gemini-3-pro-preview (most capable and accurate)
+// Simplified model list - Using Gemini 3 Flash for speed + accuracy
+// Primary: gemini-3-flash-preview (fast and capable)
 // Backup: gemini-pro-latest (proven working fallback)
 const MODELS = [
-    { name: 'gemini-3-pro-preview', version: 'v1beta', rank: 100 },   // Most accurate (Gemini 3.0)
-    { name: 'gemini-pro-latest', version: 'v1beta', rank: 90 },       // Fallback
+    { name: 'gemini-3-flash-preview', version: 'v1beta', rank: 100 },  // Fast + Accurate (Gemini 3.0)
+    { name: 'gemini-pro-latest', version: 'v1beta', rank: 90 },        // Fallback
 ];
 
 // Blocklist for rate-limited or failed models (clears after 5 minutes)
