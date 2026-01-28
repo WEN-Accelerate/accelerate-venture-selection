@@ -18,20 +18,22 @@ You were actually already using REST APIs directly (not the SDK), which is good!
 
 ### 🎯 Key Optimizations
 
-#### 1. **Curated Model List** (Lines 13-17)
+#### 1. **Curated Model List** (Lines 13-20)
 ```javascript
 const MODELS = [
-    { name: 'gemini-1.5-flash-latest', version: 'v1', rank: 90 },
-    { name: 'gemini-1.5-flash-002', version: 'v1', rank: 85 },
-    { name: 'gemini-1.5-pro-latest', version: 'v1', rank: 80 },
-    { name: 'gemini-pro', version: 'v1', rank: 70 },
+    { name: 'gemini-1.5-flash', version: 'v1beta', rank: 90 },
+    { name: 'gemini-1.5-pro', version: 'v1beta', rank: 85 },
+    { name: 'gemini-pro', version: 'v1beta', rank: 80 },
+    { name: 'gemini-1.5-flash', version: 'v1', rank: 70 }, // v1 fallback
 ];
 ```
 - **Before**: Discovered 29 models dynamically on every request
-- **After**: Use only 4 carefully selected, fast models
+- **After**: Use only 4 carefully selected, fast models with correct API names
 - **Impact**: ~90% reduction in API calls and latency
 
-#### 2. **Smart Blocklist for Rate-Limited Models** (Lines 19-39)
+> **Note**: Initial version used incorrect model names (e.g., `gemini-1.5-flash-latest`) which caused 404 errors. Fixed to use base model names that the API actually recognizes.
+
+#### 2. **Smart Blocklist for Rate-Limited Models** (Lines 22-39)
 ```javascript
 const modelBlocklist = new Map();
 const BLOCKLIST_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -107,15 +109,34 @@ if (response.status >= 500 || attempt === retries) {
 
 ### Expected Speedup: **5-10x faster**
 
+## Troubleshooting
+
+### Issue: All models returning 404 errors
+**Root Cause**: Using incorrect model names like `gemini-1.5-flash-latest` or `gemini-1.5-flash-002`
+
+**Solution**: Use base model names:
+- ✅ `gemini-1.5-flash` (not `gemini-1.5-flash-latest`)
+- ✅ `gemini-1.5-pro` (not `gemini-1.5-pro-latest`)
+- ✅ `gemini-pro`
+
+### Issue: Rate limiting (429 errors)
+**Root Cause**: API quota exceeded
+
+**Solutions**:
+1. Use the blocklist feature (already implemented)
+2. Upgrade your API quota
+3. Implement request queuing
+4. Add user-facing rate limit warnings
+
 ## What You Can Do Next
 
 ### Option 1: Add More Models (If Needed)
-If you need experimental models like `gemini-exp-1206`, add them to the `MODELS` array:
+If you need experimental models, add them to the `MODELS` array:
 ```javascript
 const MODELS = [
-    { name: 'gemini-1.5-flash-latest', version: 'v1', rank: 90 },
-    { name: 'gemini-exp-1206', version: 'v1beta', rank: 100 }, // ← Add here
-    { name: 'gemini-1.5-pro-latest', version: 'v1', rank: 80 },
+    { name: 'gemini-1.5-flash', version: 'v1beta', rank: 90 },
+    { name: 'gemini-2.0-flash-exp', version: 'v1beta', rank: 95 }, // ← Add here
+    { name: 'gemini-1.5-pro', version: 'v1beta', rank: 85 },
 ];
 ```
 
@@ -134,26 +155,31 @@ If 5 minutes is too long/short:
 const BLOCKLIST_DURATION = 2 * 60 * 1000; // 2 minutes
 ```
 
-## Testing
+## Deployment History
 
-✅ Build successful with no errors
-✅ All imports working correctly
-✅ Ready to deploy
+### Commit 1: Initial Optimization (1d4e699)
+- Implemented curated model list, blocklist, retry logic
+- **Issue**: Used incorrect model names causing 404 errors
 
-## Next Steps
+### Commit 2: Hotfix (cb7948c) ✅ CURRENT
+- Fixed model names to use correct Gemini API identifiers
+- Changed to v1beta endpoint
+- **Status**: Working correctly
 
-1. Deploy the changes to production
-2. Monitor the console logs for new emoji-based status messages:
-   - 🚀 AI Service: Starting generation...
-   - ⚡ AI Service: Attempting gemini-1.5-flash-latest...
-   - ✅ AI Service: Success with gemini-1.5-flash-latest (1234 chars)
-   - ⏸️ AI Service: Blocked gemini-exp-1206 for 300s
+## Console Log Guide
 
-3. If you see consistent rate limiting, consider:
-   - Upgrading your API quota
-   - Implementing request queuing
-   - Adding user-facing rate limit warnings
+Look for these emoji-based status messages:
+- 🚀 AI Service: Starting generation...
+- 📋 AI Service: Trying N models: ...
+- ⚡ AI Service: Attempting [model-name]...
+- ✅ AI Service: Success with [model-name] (1234 chars)
+- ⚠️ AI Service: [model-name] failed (404/429/500)
+- ⏳ Retrying in 500ms...
+- ⏸️ AI Service: Blocked [model-name] for 300s
+- ↪️ Trying next model...
+- ❌ AI Service: All models failed
 
 ## Files Changed
 
 - ✏️ `src/utils/aiService.js` - Complete rewrite for performance
+- 📄 `.agent/AI_SERVICE_OPTIMIZATION_SUMMARY.md` - This documentation
