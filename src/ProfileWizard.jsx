@@ -30,7 +30,7 @@ const BRAND_COLORS = {
 // --- AI HELPER ---
 const callGemini = async (prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-    const model = "gemini-2.0-pro-exp-02-05";
+    const model = "gemini-2.0-flash-exp";
 
     if (!apiKey) return "AI simulation: Gemini response placeholder.";
 
@@ -239,7 +239,7 @@ export default function ProfileWizard() {
             If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
             const response = await ai.models.generateContent({
-                model: "gemini-2.0-pro-exp-02-05",
+                model: "gemini-2.0-flash-exp",
                 contents: prompt,
                 config: {
                     tools: [{ googleSearch: {} }],
@@ -284,7 +284,7 @@ export default function ProfileWizard() {
                 Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
 
                 const response = await ai.models.generateContent({
-                    model: "gemini-2.0-pro-exp-02-05",
+                    model: "gemini-1.5-flash",
                     contents: fallbackPrompt
                 });
 
