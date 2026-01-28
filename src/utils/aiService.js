@@ -1,191 +1,179 @@
 /**
- * AI Service - Optimized for Deep Research & Accuracy
+ * AI Service - Ultra-Fast Direct API Implementation
  * 
- * Prioritizes models in order of research capability:
- * 1. Thinking models (exp-1206, etc.) - Best for complex reasoning
- * 2. Pro models (2.0-flash-exp, 1.5-pro) - Most capable
- * 3. Flash models - Fallback only
+ * Optimized for speed by:
+ * - Using curated model list (no discovery overhead)
+ * - Smart caching of rate-limited models
+ * - Exponential backoff for retries
+ * - Minimal API calls
  */
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Cache for discovered models
-let discoveredModels = null;
+// Curated model list - ordered by preference (fastest first)
+const MODELS = [
+    { name: 'gemini-1.5-flash-latest', version: 'v1', rank: 90 },
+    { name: 'gemini-1.5-flash-002', version: 'v1', rank: 85 },
+    { name: 'gemini-1.5-pro-latest', version: 'v1', rank: 80 },
+    { name: 'gemini-pro', version: 'v1', rank: 70 },
+];
+
+// Blocklist for rate-limited or failed models (clears after 5 minutes)
+const modelBlocklist = new Map();
+const BLOCKLIST_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Discover and rank models by research capability
+ * Check if model is currently blocked
  */
-const discoverModels = async () => {
-    if (discoveredModels) return discoveredModels;
+const isModelBlocked = (modelName) => {
+    const blockedUntil = modelBlocklist.get(modelName);
+    if (!blockedUntil) return false;
 
-    try {
-        console.log("AI Service: Discovering available models...");
-
-        // Try both v1 and v1beta endpoints
-        const endpoints = [
-            `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`,
-            `https://generativelanguage.googleapis.com/v1/models?key=${API_KEY}`
-        ];
-
-        for (const endpoint of endpoints) {
-            try {
-                const response = await fetch(endpoint);
-                if (!response.ok) continue;
-
-                const data = await response.json();
-                const models = data.models || [];
-
-                // Filter for models that support generateContent
-                const contentModels = models
-                    .filter(m => {
-                        // Must support generateContent
-                        if (!m.supportedGenerationMethods?.includes('generateContent')) return false;
-
-                        // Exclude image generation models (not suitable for text/JSON)
-                        const name = m.name.toLowerCase();
-                        if (name.includes('image-generation')) return false;
-                        if (name.includes('imagen')) return false;
-
-                        return true;
-                    })
-                    .map(m => {
-                        const name = m.name.replace('models/', '');
-                        return {
-                            name,
-                            fullName: m.name,
-                            version: endpoint.includes('v1beta') ? 'v1beta' : 'v1',
-                            // Rank by capability (higher = better for research)
-                            rank: getModelRank(name)
-                        };
-                    })
-                    .sort((a, b) => b.rank - a.rank); // Sort by rank descending
-
-                if (contentModels.length > 0) {
-                    console.log("AI Service: Discovered models (ranked):", contentModels.map(m => `${m.name} (rank: ${m.rank})`));
-                    discoveredModels = contentModels;
-                    return contentModels;
-                }
-            } catch (e) {
-                continue;
-            }
-        }
-
-        console.warn("AI Service: Could not discover any models");
-        return [];
-
-    } catch (error) {
-        console.error("AI Service: Discovery failed:", error);
-        return [];
+    if (Date.now() > blockedUntil) {
+        modelBlocklist.delete(modelName);
+        return false;
     }
+    return true;
 };
 
 /**
- * Rank models by research/accuracy capability
+ * Block a model temporarily
  */
-const getModelRank = (modelName) => {
-    const name = modelName.toLowerCase();
-
-    // Experimental thinking models (best for deep research)
-    if (name.includes('thinking') || name.includes('exp-1206')) return 100;
-
-    // Gemini 2.0 experimental models
-    if (name.includes('gemini-2.0') && name.includes('exp')) return 90;
-
-    // Pro models (high capability)
-    if (name.includes('gemini-2.0') && name.includes('pro')) return 85;
-    if (name.includes('gemini-1.5-pro')) return 80;
-    if (name.includes('gemini-pro')) return 70;
-
-    // Flash models (fast but less capable)
-    if (name.includes('gemini-2.0') && name.includes('flash')) return 60;
-    if (name.includes('gemini-1.5-flash')) return 50;
-
-    // Gemini 1.0 (legacy)
-    if (name.includes('gemini-1.0')) return 40;
-
-    // Unknown models
-    return 30;
+const blockModel = (modelName, duration = BLOCKLIST_DURATION) => {
+    modelBlocklist.set(modelName, Date.now() + duration);
+    console.log(`⏸️ AI Service: Blocked ${modelName} for ${duration / 1000}s`);
 };
 
 /**
- * reliableGenerateContent - Uses best available model with optimized settings
+ * Sleep utility for retry logic
  */
-export const reliableGenerateContent = async (prompt, options = {}) => {
-    if (!API_KEY) {
-        console.warn("AI Service: No API Key found.");
-        return null;
-    }
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // Discover and rank available models
-    const models = await discoverModels();
+/**
+ * Make a single API call with retry logic
+ */
+const callModel = async (model, prompt, generationConfig, retries = 2) => {
+    const url = `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${API_KEY}`;
 
-    if (models.length === 0) {
-        console.error("AI Service: No models available with this API key");
-        throw new Error("No AI models available. Please check your API key permissions.");
-    }
-
-    // Configuration for accurate, factual responses
-    const generationConfig = {
-        temperature: options.temperature ?? 0.1, // Low temperature = more deterministic/factual
-        topK: options.topK ?? 40,
-        topP: options.topP ?? 0.8,
-        maxOutputTokens: options.maxOutputTokens ?? 8192,
+    const requestBody = {
+        contents: [{
+            parts: [{ text: prompt }]
+        }],
+        generationConfig
     };
 
-    // Try each model (already sorted by rank)
-    for (const model of models) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
         try {
-            console.log(`AI Service: Attempting ${model.name} (rank: ${model.rank}) via ${model.version}...`);
-
-            const url = `https://generativelanguage.googleapis.com/${model.version}/${model.fullName}:generateContent?key=${API_KEY}`;
-
-            const requestBody = {
-                contents: [{
-                    parts: [{ text: prompt }]
-                }],
-                generationConfig
-            };
-
-            // Add search grounding for supported models (v1beta only)
-            if (model.version === 'v1beta' && options.useSearch !== false) {
-                requestBody.tools = [{
-                    googleSearch: {}
-                }];
-                console.log(`  → Enabled web search grounding for ${model.name}`);
-            }
-
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.warn(`AI Service: ${model.name} failed (${response.status})`);
-                continue; // Try next model
+            // Handle rate limiting (429)
+            if (response.status === 429) {
+                console.warn(`⚠️ AI Service: ${model.name} rate limited (429)`);
+                blockModel(model.name, BLOCKLIST_DURATION);
+                return { error: 'rate_limit', status: 429 };
             }
 
+            // Handle other errors
+            if (!response.ok) {
+                console.warn(`⚠️ AI Service: ${model.name} failed (${response.status})`);
+
+                // Block model on persistent errors
+                if (response.status >= 500 || attempt === retries) {
+                    blockModel(model.name, 60 * 1000); // 1 minute for server errors
+                }
+
+                // Retry with exponential backoff
+                if (attempt < retries) {
+                    const backoff = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s...
+                    console.log(`  ⏳ Retrying in ${backoff}ms...`);
+                    await sleep(backoff);
+                    continue;
+                }
+
+                return { error: 'http_error', status: response.status };
+            }
+
+            // Parse response
             const data = await response.json();
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-            if (text) {
-                console.log(`AI Service: ✓ Success with ${model.name} (${text.length} chars)`);
-                return text;
+            if (!text) {
+                console.warn(`⚠️ AI Service: ${model.name} returned empty response`);
+                return { error: 'empty_response' };
             }
 
-            console.warn(`AI Service: ${model.name} returned empty response`);
-            continue;
+            console.log(`✅ AI Service: Success with ${model.name} (${text.length} chars)`);
+            return { success: true, text };
 
         } catch (error) {
-            console.warn(`AI Service: ${model.name} exception:`, error.message);
-            continue; // Try next model
+            console.warn(`⚠️ AI Service: ${model.name} exception:`, error.message);
+
+            // Retry on network errors
+            if (attempt < retries) {
+                const backoff = Math.pow(2, attempt) * 500;
+                console.log(`  ⏳ Retrying in ${backoff}ms...`);
+                await sleep(backoff);
+                continue;
+            }
+
+            return { error: 'exception', message: error.message };
         }
     }
 
+    return { error: 'max_retries' };
+};
+
+/**
+ * reliableGenerateContent - Optimized for speed and reliability
+ */
+export const reliableGenerateContent = async (prompt, options = {}) => {
+    if (!API_KEY) {
+        console.warn("❌ AI Service: No API Key found.");
+        return null;
+    }
+
+    console.log("🚀 AI Service: Starting generation...");
+
+    // Configuration optimized for speed and accuracy
+    const generationConfig = {
+        temperature: options.temperature ?? 0.2, // Slightly higher for better quality
+        topK: options.topK ?? 40,
+        topP: options.topP ?? 0.85,
+        maxOutputTokens: options.maxOutputTokens ?? 8192,
+    };
+
+    // Filter out blocked models
+    const availableModels = MODELS.filter(m => !isModelBlocked(m.name));
+
+    if (availableModels.length === 0) {
+        console.warn("⚠️ AI Service: All models are currently blocked. Trying anyway...");
+        // If all blocked, try them anyway (blocklist might be stale)
+        availableModels.push(...MODELS);
+    }
+
+    console.log(`📋 AI Service: Trying ${availableModels.length} models: ${availableModels.map(m => m.name).join(', ')}`);
+
+    // Try each available model
+    for (const model of availableModels) {
+        console.log(`⚡ AI Service: Attempting ${model.name}...`);
+
+        const result = await callModel(model, prompt, generationConfig);
+
+        if (result.success) {
+            return result.text;
+        }
+
+        // Continue to next model on any error
+        console.log(`  ↪️ Trying next model...`);
+    }
+
     // All models failed
-    console.error("AI Service: All discovered models failed.");
-    throw new Error("AI Generation Failed: All available models returned errors.");
+    console.error("❌ AI Service: All models failed.");
+    throw new Error("AI Generation Failed: All models returned errors. Please try again later.");
 };
 
 /**
@@ -238,8 +226,8 @@ export const cleanAndParseJson = (text) => {
         }
 
     } catch (e) {
-        console.error("JSON Parse Error (all strategies failed):", e);
-        console.error("Problematic text:", text.substring(0, 500));
+        console.error("❌ JSON Parse Error (all strategies failed):", e);
+        console.error("📄 Problematic text:", text.substring(0, 500));
         return {};
     }
 };
