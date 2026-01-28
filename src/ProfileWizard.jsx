@@ -34,7 +34,7 @@ const callGemini = async (prompt) => {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -127,6 +127,22 @@ export default function ProfileWizard() {
             setConsultantMode(true);
             console.log("Consultant Mode Active: Adding Client Profile");
         }
+
+        // DEBUG: Check available models
+        const debugModels = async () => {
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+            if (apiKey) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                    const data = await response.json();
+                    console.log("AVAILABLE MODELS:", data);
+                } catch (e) {
+                    console.error("Failed to list models", e);
+                }
+            }
+        };
+        debugModels();
+
     }, []);
 
     // Chat State
@@ -212,9 +228,9 @@ export default function ProfileWizard() {
         };
 
         try {
-            console.log("Attempting Analysis with gemini-2.0-flash-exp...");
+            console.log("Attempting Analysis with gemini-1.5-flash-002...");
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
 
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:
