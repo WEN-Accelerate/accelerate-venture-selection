@@ -250,7 +250,8 @@ export default function ProfileWizard() {
             1. Domestic Expansion Scenario
             2. International Expansion Scenario
             
-            Return JSON: { "domestic": "string", "international": "string" }
+            CRITICAL: Return ONLY valid JSON. No explanations, no markdown, no additional text.
+            Format: { "domestic": "string", "international": "string" }
         `;
         try {
             const raw = await reliableGenerateContent(prompt);

@@ -37,7 +37,17 @@ const discoverModels = async () => {
 
                 // Filter for models that support generateContent
                 const contentModels = models
-                    .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+                    .filter(m => {
+                        // Must support generateContent
+                        if (!m.supportedGenerationMethods?.includes('generateContent')) return false;
+
+                        // Exclude image generation models (not suitable for text/JSON)
+                        const name = m.name.toLowerCase();
+                        if (name.includes('image-generation')) return false;
+                        if (name.includes('imagen')) return false;
+
+                        return true;
+                    })
                     .map(m => {
                         const name = m.name.replace('models/', '');
                         return {
@@ -180,20 +190,56 @@ export const reliableGenerateContent = async (prompt, options = {}) => {
 
 /**
  * Helper to parse loose JSON often returned by AI
+ * Handles multiple formats: pure JSON, markdown blocks, narrative + JSON, etc.
  */
 export const cleanAndParseJson = (text) => {
     if (!text) return {};
+
     try {
-        let clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        // Sometimes AI adds text before or after, find the first '{' and last '}'
-        const first = clean.indexOf('{');
-        const last = clean.lastIndexOf('}');
-        if (first >= 0 && last >= 0) {
-            clean = clean.substring(first, last + 1);
+        // Strategy 1: Remove markdown code blocks
+        let clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+
+        // Strategy 2: Extract JSON from mixed content
+        // Look for the first '{' or '[' and last '}' or ']'
+        const firstBrace = clean.indexOf('{');
+        const firstBracket = clean.indexOf('[');
+        const lastBrace = clean.lastIndexOf('}');
+        const lastBracket = clean.lastIndexOf(']');
+
+        // Determine if it's an object or array
+        let start = -1;
+        let end = -1;
+
+        if (firstBrace >= 0 && (firstBracket < 0 || firstBrace < firstBracket)) {
+            // Object
+            start = firstBrace;
+            end = lastBrace;
+        } else if (firstBracket >= 0) {
+            // Array
+            start = firstBracket;
+            end = lastBracket;
         }
-        return JSON.parse(clean);
+
+        if (start >= 0 && end >= 0 && end > start) {
+            clean = clean.substring(start, end + 1);
+        }
+
+        // Strategy 3: Try to parse
+        try {
+            return JSON.parse(clean);
+        } catch (e) {
+            // Strategy 4: Try to fix common JSON issues
+            // Remove trailing commas before } or ]
+            clean = clean.replace(/,(\s*[}\]])/g, '$1');
+            // Fix single quotes to double quotes (common AI mistake)
+            clean = clean.replace(/'/g, '"');
+            // Try again
+            return JSON.parse(clean);
+        }
+
     } catch (e) {
-        console.error("JSON Parse Error:", e);
+        console.error("JSON Parse Error (all strategies failed):", e);
+        console.error("Problematic text:", text.substring(0, 500));
         return {};
     }
 };
