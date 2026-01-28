@@ -6,8 +6,9 @@ import {
     BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
     Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid, BarChart3
 } from 'lucide-react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/generative-ai";
 import QuarterlyProgress from './QuarterlyProgressComponent';
+import { reliableGenerateContent, cleanAndParseJson } from './utils/aiService';
 
 // --- CONFIG ---
 
@@ -956,14 +957,6 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
     const generatePlanWithAI = async () => {
         setAiLoading(true);
         try {
-            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-            if (!apiKey) {
-                alert("AI Simulation: Key missing.");
-                setAiLoading(false);
-                return;
-            }
-            const genAI = new GoogleGenerativeAI(apiKey);
-
             const prompt = `
                 Act as a Strategy Consultant for ${profile.companyName || 'a company'} (Industry: ${profile.industry || 'Unknown'}).
                 
@@ -996,31 +989,17 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 Return JSON only.
             `;
 
-            try {
-                // Try 1.5 Pro-002 first
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-002" });
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                text = response.text();
-            } catch (err) {
-                console.warn("Gemini 1.5 Pro-002 failed, trying Flash-002...", err);
-                // Fallback to Flash-002
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
-                const result = await model.generateContent(prompt);
-                const response = await result.response;
-                text = response.text();
-            }
+            const text = await reliableGenerateContent(prompt);
 
-            // Loose JSON parsing
-            const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(cleanJson);
+            if (!text) throw new Error("AI returned empty response");
+
+            const data = cleanAndParseJson(text);
 
             setDescription(data.description || description);
             setContext(data.context || context);
             setObjectives(data.objectives || objectives);
 
             if (data.actions && Array.isArray(data.actions)) {
-                // Map to our internal structure
                 const newActions = data.actions.map((act, idx) => ({
                     id: Date.now() + idx,
                     text: act.text,
@@ -1028,8 +1007,6 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                     expert: act.expert || false,
                     knowledgePack: act.knowledge_pack || false
                 }));
-                // Append or replace? Let's replace if empty, or append if exists? 
-                // Let's replace to be clean, user can regenerate.
                 setSubActions(newActions);
             }
 

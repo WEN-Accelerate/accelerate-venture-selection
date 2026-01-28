@@ -28,43 +28,7 @@ const BRAND_COLORS = {
 };
 
 // --- AI HELPER ---
-// --- AI HELPER ---
-const callGemini = async (prompt) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-
-    if (!apiKey) return "AI simulation: Gemini response placeholder.";
-
-    try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        // Try the latest stable model first
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-002" });
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return response.text();
-    } catch (error) {
-        console.warn("Gemini 1.5 Pro failed, trying Flash...", error);
-        try {
-            // Fallback to Flash
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
-            const result = await model.generateContent(prompt);
-            return result.response.text();
-        } catch (e2) {
-            console.warn("Gemini 1.5 Flash failed, trying 1.0 Pro...", e2);
-            try {
-                // Fallback to Gemini 1.0 Pro
-                const genAI = new GoogleGenerativeAI(apiKey);
-                const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-                const result = await model.generateContent(prompt);
-                return result.response.text();
-            } catch (e3) {
-                console.error("All Gemini models failed:", e3);
-                return "AI Error: Could not generate response.";
-            }
-        }
-    }
-};
+import { reliableGenerateContent, cleanAndParseJson } from './utils/aiService';
 
 // --- RENDER HELPERS ---
 // Moved outside to prevent re-render focus loss
@@ -216,26 +180,13 @@ export default function ProfileWizard() {
 
     // --- STEP 1: SCRAPE ---
     // --- STEP 1: SCRAPE ---
+    // --- STEP 1: SCRAPE ---
     const handleScrape = async () => {
         if (!profile.companyName) return;
         setLoading(true);
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-        const genAI = new GoogleGenerativeAI(apiKey);
-
-        // Helper to parse loose JSON
-        const parseLooseJson = (text) => {
-            try {
-                const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                return JSON.parse(clean);
-            } catch (e) {
-                console.error("JSON Parse Failed", e);
-                return {};
-            }
-        };
 
         try {
-            console.log("Attempting Deep Search with gemini-1.5-pro-002...");
-            // ATTEMPT 1: Deep Search with gemini-1.5-pro-002 (Latest Stable)
+            console.log("Attempting Deep Search via AI Service...");
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:
             {
@@ -252,16 +203,12 @@ export default function ProfileWizard() {
             }
             If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-002" });
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
+            const rawText = await reliableGenerateContent(prompt);
 
-            // Handle response
-            let rawText = response.text();
-            if (!rawText) throw new Error("Empty response from Search model");
+            if (!rawText) throw new Error("Empty response from AI");
 
             console.log("Search Response:", rawText);
-            const data = parseLooseJson(rawText);
+            const data = cleanAndParseJson(rawText);
 
             if (!data.name && !data.industry) {
                 throw new Error("Search returned not useful data");
@@ -284,37 +231,11 @@ export default function ProfileWizard() {
             setStep(2);
 
         } catch (error) {
-            console.warn("Deep Search Failed, falling back to Internal Knowledge...", error);
-
-            try {
-                // ATTEMPT 2: Fallback to gemini-1.5-flash-002 (Internal Knowledge)
-                const fallbackPrompt = `Act as a business analyst. Analyze company "${profile.companyName}".
-                Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
-
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
-                const result = await model.generateContent(fallbackPrompt);
-                const response = await result.response;
-
-                let rawText = response.text();
-                const data = parseLooseJson(rawText || "{}");
-
-                setProfile(prev => ({
-                    ...prev,
-                    companyName: data.name || prev.companyName,
-                    industry: data.industry || "",
-                    products: Array.isArray(data.products) ? data.products.join(", ") : (data.products || ""),
-                    customers: Array.isArray(data.customers) ? data.customers.join(", ") : (data.customers || ""),
-                    employees: data.employees || "",
-                    keyPersonnel: Array.isArray(data.promoters) ? data.promoters.join(", ") : (data.promoters || ""),
-                }));
-                setAiContext(`Analyzed ${profile.companyName} using Internal Knowledge.`);
-                setStep(2);
-
-            } catch (finalError) {
-                console.error("All AI attempts failed", finalError);
-                setAiContext("Could not auto-analyze. Please fill manually.");
-                setStep(2);
-            }
+            console.warn("Deep Search Failed, falling back to manual entry...", error);
+            // Even if AI fails, we proceed to next step so user can fill manually
+            // But let's stay on Step 1 or show error? 
+            // Better: Go to Step 2 so they can manually input.
+            setStep(2);
         }
         setLoading(false);
     };
@@ -332,9 +253,8 @@ export default function ProfileWizard() {
             Return JSON: { "domestic": "string", "international": "string" }
         `;
         try {
-            const raw = await callGemini(prompt);
-            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(clean);
+            const raw = await reliableGenerateContent(prompt);
+            const data = cleanAndParseJson(raw);
             setHypotheticalExamples({
                 domestic: data.domestic || "Expand to adjacent cities...",
                 international: data.international || "Export to Southeast Asia..."
@@ -420,7 +340,7 @@ export default function ProfileWizard() {
 
     const handleSubItemLearnMore = async (category, subItem) => {
         const prompt = `Explain what "${subItem}" involves in the context of "${category}" for a startup. Keep it to 1 sentence.`;
-        const res = await callGemini(prompt);
+        const res = await reliableGenerateContent(prompt);
         alert(`${subItem} (${category}):\n\n${res}`);
     };
 
@@ -459,7 +379,7 @@ export default function ProfileWizard() {
 
             Format as a cohesive narrative (approx 200 words).
         `;
-        const res = await callGemini(prompt);
+        const res = await reliableGenerateContent(prompt);
         setOnePageSummary(res);
         setOnePageLoading(false);
     };
@@ -484,7 +404,7 @@ export default function ProfileWizard() {
             
             Provide a short, specific, and high-impact piece of advice (max 2 sentences).
         `;
-        const reply = await callGemini(prompt);
+        const reply = await reliableGenerateContent(prompt);
         setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
     };
 
@@ -514,9 +434,8 @@ export default function ProfileWizard() {
         `;
 
         try {
-            const raw = await callGemini(prompt);
-            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(clean);
+            const raw = await reliableGenerateContent(prompt);
+            const parsed = cleanAndParseJson(raw);
             setLearnMoreData(Array.isArray(parsed) ? parsed : [parsed]);
         } catch (e) {
             console.error("AI Error", e);
@@ -554,9 +473,8 @@ export default function ProfileWizard() {
             Return JSON: { "product": "...", "proposition": "...", "place": "...", "promotion": "..." }
         `;
         try {
-            const raw = await callGemini(prompt);
-            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(clean);
+            const raw = await reliableGenerateContent(prompt);
+            const data = cleanAndParseJson(raw);
             setProfile(prev => ({
                 ...prev,
                 strategyDimensions: {
