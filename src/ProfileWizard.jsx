@@ -28,12 +28,21 @@ const BRAND_COLORS = {
 };
 
 // --- AI HELPER ---
-const validateModel = async (apiKey) => {
+const validateModel = async (apiKey, preference = 'speed') => {
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
         if (!response.ok) return "gemini-1.5-flash"; // Fallback
         const data = await response.json();
         const models = data.models || [];
+
+        if (preference === 'accuracy') {
+            // Priority: 1.5 Pro -> Pro -> Flash
+            const pro15 = models.find(m => m.name.includes('gemini-1.5-pro') && m.supportedGenerationMethods?.includes('generateContent'));
+            if (pro15) return pro15.name.replace('models/', '');
+
+            const pro = models.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods?.includes('generateContent'));
+            if (pro) return pro.name.replace('models/', '');
+        }
 
         // Prefer Flash, then Pro, then any gemini
         const flash = models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent'));
@@ -255,7 +264,8 @@ export default function ProfileWizard() {
         };
 
         try {
-            const modelName = await validateModel(apiKey);
+            // User requested "deep research" / accuracy for scraping
+            const modelName = await validateModel(apiKey, 'accuracy');
             console.log(`Attempting Analysis with ${modelName}...`);
             const genAI = new GoogleGenerativeAI(apiKey);
             const model = genAI.getGenerativeModel({ model: modelName });
