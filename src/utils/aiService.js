@@ -10,13 +10,12 @@
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Curated model list - ordered by preference (fastest first)
-// Using actual working model names from Gemini API
+// Curated model list - Using models PROVEN to work from original logs
+// These are the exact model names that succeeded in production
 const MODELS = [
-    { name: 'gemini-1.5-flash', version: 'v1beta', rank: 90 },
-    { name: 'gemini-1.5-pro', version: 'v1beta', rank: 85 },
-    { name: 'gemini-pro', version: 'v1beta', rank: 80 },
-    { name: 'gemini-1.5-flash', version: 'v1', rank: 70 }, // v1 fallback
+    { name: 'gemini-1.5-flash-8b', version: 'v1beta', rank: 90 },  // Fastest
+    { name: 'gemini-pro-latest', version: 'v1beta', rank: 85 },     // Most reliable (proven working)
+    { name: 'gemini-1.5-pro-002', version: 'v1beta', rank: 80 },   // Backup
 ];
 
 // Blocklist for rate-limited or failed models (clears after 5 minutes)
