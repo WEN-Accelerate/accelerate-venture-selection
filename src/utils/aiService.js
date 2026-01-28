@@ -52,7 +52,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 /**
  * Make a single API call with retry logic
  */
-const callModel = async (model, prompt, generationConfig, retries = 2) => {
+const callModel = async (model, prompt, generationConfig, options = {}) => {
     const url = `https://generativelanguage.googleapis.com/${model.version}/models/${model.name}:generateContent?key=${API_KEY}`;
 
     const requestBody = {
@@ -62,7 +62,26 @@ const callModel = async (model, prompt, generationConfig, retries = 2) => {
         generationConfig
     };
 
-    for (let attempt = 0; attempt <= retries; attempt++) {
+    // CRITICAL: Enable Google Search grounding for accurate, factual responses
+    // This prevents hallucination by grounding answers in real web search results
+    if (options.useSearch !== false && model.version === 'v1beta') {
+        requestBody.tools = [{
+            googleSearch: {}
+        }];
+        console.log(`  🔍 Enabled web search grounding for ${model.name}`);
+    }
+
+    // Add JSON schema if provided (enforces structured output)
+    if (options.responseSchema && model.version === 'v1beta') {
+        requestBody.generationConfig = {
+            ...requestBody.generationConfig,
+            responseMimeType: "application/json",
+            responseSchema: options.responseSchema
+        };
+        console.log(`  📋 Enforcing JSON schema`);
+    }
+
+    for (let attempt = 0; attempt <= 2; attempt++) {
         try {
             const response = await fetch(url, {
                 method: 'POST',
@@ -82,12 +101,12 @@ const callModel = async (model, prompt, generationConfig, retries = 2) => {
                 console.warn(`⚠️ AI Service: ${model.name} failed (${response.status})`);
 
                 // Block model on persistent errors
-                if (response.status >= 500 || attempt === retries) {
+                if (response.status >= 500 || attempt === 2) {
                     blockModel(model.name, 60 * 1000); // 1 minute for server errors
                 }
 
                 // Retry with exponential backoff
-                if (attempt < retries) {
+                if (attempt < 2) {
                     const backoff = Math.pow(2, attempt) * 500; // 500ms, 1s, 2s...
                     console.log(`  ⏳ Retrying in ${backoff}ms...`);
                     await sleep(backoff);
@@ -106,14 +125,25 @@ const callModel = async (model, prompt, generationConfig, retries = 2) => {
                 return { error: 'empty_response' };
             }
 
+            // Extract grounding metadata (sources) if available
+            const groundingMetadata = data.candidates?.[0]?.groundingMetadata;
+            const sources = groundingMetadata?.groundingChunks?.map(chunk => ({
+                uri: chunk.web?.uri,
+                title: chunk.web?.title
+            })).filter(s => s.uri) || [];
+
+            if (sources.length > 0) {
+                console.log(`  📚 Found ${sources.length} web sources`);
+            }
+
             console.log(`✅ AI Service: Success with ${model.name} (${text.length} chars)`);
-            return { success: true, text };
+            return { success: true, text, sources };
 
         } catch (error) {
             console.warn(`⚠️ AI Service: ${model.name} exception:`, error.message);
 
             // Retry on network errors
-            if (attempt < retries) {
+            if (attempt < 2) {
                 const backoff = Math.pow(2, attempt) * 500;
                 console.log(`  ⏳ Retrying in ${backoff}ms...`);
                 await sleep(backoff);
@@ -157,11 +187,17 @@ export const reliableGenerateContent = async (prompt, options = {}) => {
 
     console.log(`📋 AI Service: Trying ${availableModels.length} models: ${availableModels.map(m => m.name).join(', ')}`);
 
+    // Enable web search by default for accurate, factual responses
+    const callOptions = {
+        useSearch: options.useSearch !== false, // Default: enabled
+        responseSchema: options.responseSchema  // Optional JSON schema
+    };
+
     // Try each available model
     for (const model of availableModels) {
         console.log(`⚡ AI Service: Attempting ${model.name}...`);
 
-        const result = await callModel(model, prompt, generationConfig);
+        const result = await callModel(model, prompt, generationConfig, callOptions);
 
         if (result.success) {
             return result.text;
