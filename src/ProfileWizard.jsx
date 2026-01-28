@@ -28,13 +28,40 @@ const BRAND_COLORS = {
 };
 
 // --- AI HELPER ---
+const validateModel = async (apiKey) => {
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (!response.ok) return "gemini-1.5-flash"; // Fallback
+        const data = await response.json();
+        const models = data.models || [];
+
+        // Prefer Flash, then Pro, then any gemini
+        const flash = models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (flash) return flash.name.replace('models/', '');
+
+        const pro = models.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (pro) return pro.name.replace('models/', '');
+
+        const anyGemini = models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (anyGemini) return anyGemini.name.replace('models/', '');
+
+        return "gemini-1.5-flash";
+    } catch (e) {
+        console.error("Model validation failed", e);
+        return "gemini-1.5-flash";
+    }
+};
+
 const callGemini = async (prompt) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
     if (!apiKey) return "AI simulation: Gemini response placeholder.";
 
     try {
+        const modelName = await validateModel(apiKey);
+        console.log("Using Model:", modelName);
+
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -135,7 +162,7 @@ export default function ProfileWizard() {
                 try {
                     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
                     const data = await response.json();
-                    console.log("AVAILABLE MODELS:", data);
+                    console.log("AVAILABLE MODELS JSON:", JSON.stringify(data, null, 2));
                 } catch (e) {
                     console.error("Failed to list models", e);
                 }
@@ -228,9 +255,10 @@ export default function ProfileWizard() {
         };
 
         try {
-            console.log("Attempting Analysis with gemini-1.5-flash-002...");
+            const modelName = await validateModel(apiKey);
+            console.log(`Attempting Analysis with ${modelName}...`);
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
+            const model = genAI.getGenerativeModel({ model: modelName });
 
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:

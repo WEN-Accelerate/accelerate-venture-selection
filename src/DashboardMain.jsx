@@ -15,6 +15,31 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.c
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// --- AI HELPER ---
+const validateModelMain = async (apiKey) => {
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (!response.ok) return "gemini-1.5-flash"; // Fallback
+        const data = await response.json();
+        const models = data.models || [];
+
+        // Prefer Flash, then Pro, then any gemini
+        const flash = models.find(m => m.name.includes('gemini-1.5-flash') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (flash) return flash.name.replace('models/', '');
+
+        const pro = models.find(m => m.name.includes('gemini-pro') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (pro) return pro.name.replace('models/', '');
+
+        const anyGemini = models.find(m => m.name.includes('gemini') && m.supportedGenerationMethods?.includes('generateContent'));
+        if (anyGemini) return anyGemini.name.replace('models/', '');
+
+        return "gemini-1.5-flash";
+    } catch (e) {
+        console.error("Model validation failed", e);
+        return "gemini-1.5-flash";
+    }
+};
+
 export default function DashboardMain() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -962,8 +987,11 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 setAiLoading(false);
                 return;
             }
+            const modelName = await validateModelMain(apiKey);
+            console.log(`Using Model (Dashboard): ${modelName}`);
+
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
+            const model = genAI.getGenerativeModel({ model: modelName });
 
             const prompt = `
                 Act as a Strategy Consultant for ${profile.companyName || 'a company'} (Industry: ${profile.industry || 'Unknown'}).
