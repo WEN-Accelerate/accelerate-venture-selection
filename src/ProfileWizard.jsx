@@ -34,7 +34,7 @@ const callGemini = async (prompt) => {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
@@ -212,9 +212,9 @@ export default function ProfileWizard() {
         };
 
         try {
-            console.log("Attempting Analysis with gemini-1.5-flash-001...");
+            console.log("Attempting Analysis with gemini-pro...");
             const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-001" });
+            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:
