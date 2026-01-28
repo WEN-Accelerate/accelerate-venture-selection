@@ -36,14 +36,33 @@ const callGemini = async (prompt) => {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        // Try the latest stable model first
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-002" });
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
         return response.text();
     } catch (error) {
-        console.error("Gemini Error:", error);
-        return "AI Error: Could not generate response.";
+        console.warn("Gemini 1.5 Pro failed, trying Flash...", error);
+        try {
+            // Fallback to Flash
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
+            const result = await model.generateContent(prompt);
+            return result.response.text();
+        } catch (e2) {
+            console.warn("Gemini 1.5 Flash failed, trying 1.0 Pro...", e2);
+            try {
+                // Fallback to Gemini 1.0 Pro
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+                const result = await model.generateContent(prompt);
+                return result.response.text();
+            } catch (e3) {
+                console.error("All Gemini models failed:", e3);
+                return "AI Error: Could not generate response.";
+            }
+        }
     }
 };
 
@@ -215,8 +234,8 @@ export default function ProfileWizard() {
         };
 
         try {
-            console.log("Attempting Deep Search with gemini-1.5-pro...");
-            // ATTEMPT 1: Deep Search with gemini-1.5-pro (Best for reasoning/accuracy)
+            console.log("Attempting Deep Search with gemini-1.5-pro-002...");
+            // ATTEMPT 1: Deep Search with gemini-1.5-pro-002 (Latest Stable)
             const prompt = `Research the company "${profile.companyName}".
             Return a JSON object with these exact keys:
             {
@@ -233,7 +252,7 @@ export default function ProfileWizard() {
             }
             If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
 
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-002" });
             const result = await model.generateContent(prompt);
             const response = await result.response;
 
@@ -268,11 +287,11 @@ export default function ProfileWizard() {
             console.warn("Deep Search Failed, falling back to Internal Knowledge...", error);
 
             try {
-                // ATTEMPT 2: Fallback to gemini-1.5-flash (Internal Knowledge)
+                // ATTEMPT 2: Fallback to gemini-1.5-flash-002 (Internal Knowledge)
                 const fallbackPrompt = `Act as a business analyst. Analyze company "${profile.companyName}".
                 Return JSON with: name, industry, description, promoters (array), products (array), customers (array), employees, marketPosition.`;
 
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
                 const result = await model.generateContent(fallbackPrompt);
                 const response = await result.response;
 

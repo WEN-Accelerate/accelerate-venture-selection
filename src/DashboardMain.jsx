@@ -996,10 +996,20 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                 Return JSON only.
             `;
 
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            const text = response.text();
+            try {
+                // Try 1.5 Pro-002 first
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-002" });
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                text = response.text();
+            } catch (err) {
+                console.warn("Gemini 1.5 Pro-002 failed, trying Flash-002...", err);
+                // Fallback to Flash-002
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-002" });
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                text = response.text();
+            }
 
             // Loose JSON parsing
             const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
