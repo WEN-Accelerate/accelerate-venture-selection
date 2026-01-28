@@ -4,6 +4,11 @@
 
 # Admin pages - serve directly (no redirect)
 [[redirects]]
+  from = "/diagnostic.html"
+  to = "/diagnostic.html"
+  status = 200
+
+[[redirects]]
   from = "/test-admin.html"
   to = "/test-admin.html"
   status = 200
