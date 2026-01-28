@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Configuration - Super Admin Console</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
     <style>
         * {
             margin: 0;
@@ -485,13 +485,13 @@
         </div>
     </div>
 
-    <script type="module">
+    <script>
         // Initialize Supabase - Auto-detect from environment
         const { createClient } = supabase;
 
-        // Try to get from window (injected by Netlify) or use manual config
-        const SUPABASE_URL = window.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL || 'https://kwmxhpajpxokbztokpxu.supabase.co';
-        const SUPABASE_KEY = window.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bXhocGFqcHhva2J6dG9rcHh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3OTMxNTUsImV4cCI6MjA1MjM2OTE1NX0.DkxyxKCpQDJQW6I9xGU0cAYyiApcxq0HjrKWSTOwsrE';
+        // Use your Supabase credentials
+        const SUPABASE_URL = 'https://kwmxhpajpxokbztokpxu.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bXhocGFqcHhva2J6dG9rcHh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY3OTMxNTUsImV4cCI6MjA1MjM2OTE1NX0.DkxyxKCpQDJQW6I9xGU0cAYyiApcxq0HjrKWSTOwsrE';
 
         console.log('🔧 Supabase URL:', SUPABASE_URL);
         const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
