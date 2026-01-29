@@ -252,11 +252,17 @@ function ClientCard({ client }) {
             <div className="space-y-4">
                 <div>
                     <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase mb-1">
-                        <span>Journey Status</span>
-                        <span>{progress}%</span>
+                        <span>Hub</span>
+                        <span className="text-gray-900">{data.hub || 'Not Assigned'}</span>
                     </div>
-                    <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#D32F2F] rounded-full" style={{ width: `${progress}%` }}></div>
+                    <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase mt-2">
+                        <span>Segment</span>
+                        <span className={`px-2 py-0.5 rounded text-[9px] ${data.segment === 'Select' ? 'bg-purple-100 text-purple-700' :
+                                data.segment === 'Core' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-gray-100 text-gray-600'
+                            }`}>
+                            {data.segment || 'Prime'}
+                        </span>
                     </div>
                 </div>
 

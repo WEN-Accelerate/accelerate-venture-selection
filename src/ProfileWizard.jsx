@@ -602,6 +602,13 @@ export default function ProfileWizard() {
 
         setLoading(true);
 
+        // Auto-Categorization Logic based on Actual Revenue
+        const actualRevenue = parseFloat(profile.revenue) || 0;
+        let segment = "Prime";
+        if (actualRevenue > 90) segment = "Select";
+        else if (actualRevenue > 25) segment = "Core";
+
+        const finalProfile = { ...profile, segment };
         // Determine Target User ID
         // If normal user: use their uid.
         // If consultant mode: generate NEW uuid for the client.
@@ -621,7 +628,7 @@ export default function ProfileWizard() {
                     company_name: profile.companyName,
                     email: consultantMode ? profile.clientEmail : user.email,
                     full_name: consultantMode ? profile.companyName : (user.displayName || user.email),
-                    details: profile,
+                    details: finalProfile,
                     updated_at: new Date()
                 }
             ], { onConflict: 'user_id' });
@@ -633,7 +640,7 @@ export default function ProfileWizard() {
                 console.log("Falling back to local storage...");
                 localStorage.setItem('user_profile_data', JSON.stringify({
                     companyName: profile.companyName,
-                    details: profile,
+                    details: finalProfile,
                     updated_at: new Date()
                 }));
                 alert(`Note: Database request failed (${error.message}). \n\nWe saved your profile locally.`);
