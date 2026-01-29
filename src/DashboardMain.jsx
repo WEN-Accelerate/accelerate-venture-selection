@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import {
     Target, User, Calendar, ExternalLink, Filter,
-    BookOpen, MessageCircle, X, Check, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
-    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid, BarChart3
+    BookOpen, MessageCircle, X, Check, CheckCircle, Save, Loader2, Building2, Globe, Users, TrendingUp, CreditCard, Briefcase, Sparkles, LogOut,
+    Trash2, Plus, Wand2, GraduationCap, Box, Play, Send, LayoutGrid, BarChart3, ShieldCheck, Award
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/generative-ai";
 import QuarterlyProgress from './QuarterlyProgressComponent';
@@ -1442,8 +1442,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave, isLocked, isConsultan
                                                             value={action.status || 'Not Started'}
                                                             onChange={(e) => updateSubAction(action.id, 'status', e.target.value)}
                                                             className={`text-[9px] font-bold uppercase tracking-wider border rounded px-2 py-1 outline-none cursor-pointer ${action.status === 'Completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                                    action.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                                        'bg-gray-50 text-gray-500 border-gray-200'
+                                                                action.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                    'bg-gray-50 text-gray-500 border-gray-200'
                                                                 }`}
                                                         >
                                                             <option value="Not Started">Not Started</option>
@@ -1452,8 +1452,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave, isLocked, isConsultan
                                                         </select>
                                                     ) : (
                                                         <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${action.status === 'Completed' ? 'bg-green-50 text-green-700 border-green-200' :
-                                                                action.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                                    'bg-gray-50 text-gray-500 border-gray-200'
+                                                            action.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                'bg-gray-50 text-gray-500 border-gray-200'
                                                             }`}>
                                                             {action.status || 'Not Started'}
                                                         </span>
