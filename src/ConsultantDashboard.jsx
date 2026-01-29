@@ -203,12 +203,17 @@ export default function ConsultantDashboard() {
 
 // --- SUB-COMPONENTS ---
 
+// --- SUB-COMPONENTS ---
+
 function ClientCard({ client }) {
     // Determine progress (mock logic or based on filled fields)
     const data = client.details || {};
     const industry = client.details?.industry || 'Unknown Sector';
     const stage = client.details?.ventureType || 'Undecided';
     const updatedAt = new Date(client.updated_at).toLocaleDateString();
+
+    // Sprint Status Logic
+    const sprintStatus = data.sprint_status || 'Draft'; // 'Draft', 'SentToUser', 'Locked'
 
     // Calculate a rough progress %
     const fields = ['companyName', 'industry', 'revenue', 'employees', 'strategyDescription'];
@@ -227,8 +232,13 @@ function ClientCard({ client }) {
                         {data.companyName?.charAt(0) || 'C'}
                     </div>
                 </div>
-                <div className="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                    {stage === 'Domestic' ? 'Scaling' : 'Researching'}
+                <div className={`px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${sprintStatus === 'Locked'
+                        ? 'bg-green-50 border-green-200 text-green-700'
+                        : sprintStatus === 'SentToUser'
+                            ? 'bg-amber-50 border-amber-200 text-amber-700'
+                            : 'bg-gray-50 border-gray-200 text-gray-500'
+                    }`}>
+                    {sprintStatus === 'Locked' ? 'Sprint Active' : sprintStatus === 'SentToUser' ? 'Pending Acceptance' : 'Planning Phase'}
                 </div>
             </div>
 
@@ -265,3 +275,4 @@ function ClientCard({ client }) {
 function PlusCircle(props) {
     return <Plus {...props} />
 }
+

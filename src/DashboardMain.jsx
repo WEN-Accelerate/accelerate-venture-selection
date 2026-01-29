@@ -494,7 +494,10 @@ export default function DashboardMain() {
                     </div>
                 </div>
             </header>
-            <main className="max-w-7xl mx-auto px-8 pt-8 pb-20">
+            {/* USER JOURNEY TIMELINE (Visible Everywhere) */}
+            <UserJourneyTimeline profile={profile} cards={cards} />
+
+            <main className="max-w-7xl mx-auto px-8 pb-20">
 
                 {/* VIEW: CONTEXT (STRATEGY BLUEPRINT) */}
                 {viewMode === 'context' && (
@@ -577,7 +580,7 @@ export default function DashboardMain() {
                                 </div>
                                 <div className="flex flex-col md:items-end">
                                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Profitability Status</label>
-                                    <span className={`px - 4 py - 1.5 rounded - full text - xs font - bold uppercase tracking - wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
+                                    <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide ${profile.profitability === 'Profitable' ? 'bg-emerald-100 text-emerald-700' :
                                         profile.profitability === 'LossMaking' ? 'bg-red-100 text-red-700' :
                                             'bg-gray-100 text-gray-600'
                                         } `}>
@@ -676,7 +679,7 @@ export default function DashboardMain() {
                     </div>
                 )}
 
-                {/* VIEW: ACTIONS (CONSOLIDATED RESOURCES) */}
+                {/* VIEW: ACTIONS (CONSOLIDATED RESOURCES & KANBAN) */}
                 {viewMode === 'actions' && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {/* ACTIONS FILTERS */}
@@ -688,7 +691,53 @@ export default function DashboardMain() {
                             </div>
                         </div>
 
-                        <ActionCenterView cards={cards} />
+                        <ActionCenterView
+                            cards={cards}
+                            isConsultant={isConsultantView}
+                            sprintStatus={profile.sprint_status || 'Draft'}
+                            onUpdateSprintStatus={(newStatus) => {
+                                // Direct Profile Update for Sprint Status
+                                const newProfile = { ...profile, sprint_status: newStatus };
+                                setProfile(newProfile); // Optimistic
+
+                                // Reuse existing update logic (hacky but works since we handle it in handleUpdateCard for metadata, 
+                                // but for root level props we need a separate handler or just use the same pattern).
+                                // handleUpdateCard only updates metadata. We need to update the root profile.
+                                // Let's define a root updater logic inline or refactor update logic below.
+
+                                // Since handleUpdateCard is cleaner, let's create `handleUpdateProfileRoot`
+                                // Or simpler: Just call the same DB update logic.
+
+                                const params = new URLSearchParams(window.location.search);
+                                const viewClientId = params.get('view_client_id');
+                                const targetUserId = viewClientId || user.uid;
+
+                                if ((user && !user.isAnonymous) || viewClientId) {
+                                    supabase.from('profiles').upsert([{
+                                        user_id: targetUserId,
+                                        details: newProfile,
+                                        company_name: profile.companyName,
+                                        updated_at: new Date()
+                                    }], { onConflict: 'user_id' }).then(({ error }) => {
+                                        if (error) console.error("Sprint Status Update Failed", error);
+                                        else console.log("Sprint Status Updated to:", newStatus);
+                                    });
+                                } else {
+                                    localStorage.setItem('user_profile_data', JSON.stringify({ details: newProfile }));
+                                }
+                            }}
+                            onUpdateStatus={(cardId, actionId, newStatus) => {
+                                // Find the card meta
+                                const cardMeta = profile.supportMetadata?.[cardId] || {};
+                                const currentSubActions = cardMeta.subActions || [];
+
+                                const updatedSubActions = currentSubActions.map(a =>
+                                    a.id === actionId ? { ...a, status: newStatus } : a
+                                );
+
+                                handleUpdateCard(cardId, { subActions: updatedSubActions });
+                            }}
+                        />
                     </div>
                 )}
 
@@ -706,19 +755,11 @@ export default function DashboardMain() {
                 <ActionPlanPanel
                     card={selectedCard}
                     profile={profile} // Pass full profile for AI context
+                    isLocked={profile.sprint_status === 'Locked'}
+                    isConsultant={isConsultantView}
                     onClose={() => setSelectedCard(null)}
                     onSave={(updates) => {
                         handleUpdateCard(selectedCard.id, updates);
-                        // Don't close immediately on save to allow further editing, or close if preferred.
-                        // For a panel, usually explicit close is better, but let's keep it open to show success?
-                        // Actually, 'Save' usually implies 'Finish' in this context. Let's keep it open if it's "Save", close if "Done".
-                        // Logic ref: we'll just update the card live and maybe show a toast.
-                        // For now, let's keep the parent state updated but not close relevant to typical slide-over behavior.
-                        // However, to refresh the `cards` list, `selectedCard` needs to update? No, handleUpdateCard updates profile.
-                        // To keep UI in sync, we might need to re-fetch or re-calc. `cards` is memoized on profile.
-                        // We will update the `selectedCard` prop by closing/reopening? 
-                        // Better: The panel manages its own local state which initializes from props.
-                        // When we save, we push to DB. Next time it opens, it pulls new data.
                     }}
                 />
             )}
@@ -839,110 +880,295 @@ const KaizenCard = ({ card, onClick }) => {
     );
 };
 
-const ActionCenterView = ({ cards }) => {
-    // 1. Aggregate Data
-    const requests = useMemo(() => {
-        const expert = [];
-        const masterclass = [];
-        const knowledgePack = [];
+// --- NEW COMPONENTS ---
 
-        cards.forEach(card => {
-            const actions = card.subActions || [];
-            actions.forEach(action => {
-                const item = {
-                    cardTitle: card.item,
-                    actionText: action.text,
-                    id: action.id
-                };
-                if (action.expert) expert.push(item);
-                if (action.masterclass) masterclass.push(item);
-                if (action.knowledgePack) knowledgePack.push(item);
-            });
-        });
+const UserJourneyTimeline = ({ profile, cards }) => {
+    // Determine Stage
+    // 1. Onboarded (Default)
+    // 2. Sprint Designed: If cards exist and have resources mapped
+    // 3. Sprint Accepted: profile.sprint_locked === true
+    // 4. Progressing: Accepted + at least one action "In Progress" or "Completed"
+    // 5. Completed: Accepted + ALL actions "Completed"
 
-        return { expert, masterclass, knowledgePack };
-    }, [cards]);
+    const isDesigned = cards.length > 0 && cards.some(c => c.subActions && c.subActions.length > 0);
+    const isLocked = profile.sprint_status === 'Locked';
 
-    const ResourceSection = ({ title, icon: Icon, items, colorClass, buttonColor }) => (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
-            <div className={`p-6 border-b border-gray-100 ${colorClass} bg-opacity-10 flex justify-between items-center`}>
-                <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${colorClass} text-white`}>
-                        <Icon size={20} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-gray-900">{title}</h3>
-                        <p className="text-xs text-gray-500 font-semibold">{items.length} Pending Requests</p>
-                    </div>
-                </div>
-            </div>
-            <div className="p-6 flex-1 overflow-y-auto max-h-[400px] custom-scrollbar">
-                {items.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2 opacity-50">
-                        <Check size={32} />
-                        <p className="text-xs font-bold uppercase">All Clear</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {items.map((item, i) => (
-                            <div key={i} className="flex gap-3 items-start text-sm border-b border-gray-50 last:border-0 pb-3 last:pb-0">
-                                <div className="mt-1 min-w-[4px] h-[4px] rounded-full bg-gray-300"></div>
-                                <div>
-                                    <div className="font-bold text-gray-800">{item.cardTitle}</div>
-                                    <div className="text-gray-500 text-xs">{item.actionText}</div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            <div className="p-4 bg-gray-50 border-t border-gray-100">
-                <button
-                    disabled={items.length === 0}
-                    className={`w-full py-3 rounded-xl font-bold text-white text-sm shadow-md transition-all flex items-center justify-center gap-2 ${items.length === 0 ? 'bg-gray-300 cursor-not-allowed' : `${buttonColor} hover:opacity-90 hover:scale-[1.02]`}`}
-                    onClick={() => alert(`Request sent for ${items.length} items!`)}
-                >
-                    <Send size={16} /> Send Request
-                </button>
-            </div>
-        </div>
-    );
+    // Check progress
+    let totalActions = 0;
+    let completedActions = 0;
+    let inProgressActions = 0;
+
+    cards.forEach(c => {
+        const acts = c.subActions || [];
+        totalActions += acts.length;
+        completedActions += acts.filter(a => a.status === 'Completed').length;
+        inProgressActions += acts.filter(a => a.status === 'In Progress').length;
+    });
+
+    const isProgressing = isLocked && (completedActions > 0 || inProgressActions > 0);
+    const isCompleted = isLocked && totalActions > 0 && totalActions === completedActions;
+
+    let currentStage = 1;
+    if (isCompleted) currentStage = 5;
+    else if (isProgressing) currentStage = 4;
+    else if (isLocked) currentStage = 3;
+    else if (isDesigned) currentStage = 2;
+
+    const stages = [
+        { id: 1, label: 'Onboarded', icon: Check },
+        { id: 2, label: 'Sprint Designed', icon: Wand2 },
+        { id: 3, label: 'Sprint Accepted', icon: ShieldCheck },
+        { id: 4, label: 'Progressing', icon: TrendingUp },
+        { id: 5, label: 'Completed', icon: Award },
+    ];
 
     return (
-        <div className="space-y-8">
-            <div className="text-center max-w-2xl mx-auto mb-10">
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Resource Action Center</h2>
-                <p className="text-gray-500">Consolidated view of all support resources required for your expansion plan. Review and submit requests to the Wadhwani Foundation team.</p>
-            </div>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-8 animate-in fade-in slide-in-from-top-4">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6">Sprint Journey</h3>
+            <div className="relative flex justify-between">
+                {/* Connecting Line */}
+                <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-100 -z-10 -translate-y-1/2 rounded-full"></div>
+                <div className="absolute top-1/2 left-0 h-1 bg-red-600 -z-10 -translate-y-1/2 rounded-full transition-all duration-1000"
+                    style={{ width: `${((currentStage - 1) / (stages.length - 1)) * 100}%` }}></div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <ResourceSection
-                    title="Expert Network"
-                    icon={MessageCircle}
-                    items={requests.expert}
-                    colorClass="bg-purple-500"
-                    buttonColor="bg-purple-600 shadow-purple-200"
-                />
-                <ResourceSection
-                    title="Masterclasses"
-                    icon={GraduationCap}
-                    items={requests.masterclass}
-                    colorClass="bg-blue-500"
-                    buttonColor="bg-blue-600 shadow-blue-200"
-                />
-                <ResourceSection
-                    title="Knowledge Packs"
-                    icon={Box}
-                    items={requests.knowledgePack}
-                    colorClass="bg-amber-500"
-                    buttonColor="bg-amber-600 shadow-amber-200"
-                />
+                {stages.map((stage) => {
+                    const isActive = currentStage >= stage.id;
+                    const isCurrent = currentStage === stage.id;
+
+                    return (
+                        <div key={stage.id} className="flex flex-col items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${isActive
+                                ? 'bg-red-600 border-red-100 text-white shadow-lg shadow-red-200 scale-110'
+                                : 'bg-white border-gray-200 text-gray-300'
+                                }`}>
+                                <stage.icon size={16} />
+                            </div>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors duration-300 ${isActive ? 'text-gray-900' : 'text-gray-300'
+                                }`}>
+                                {stage.label}
+                            </span>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
 };
 
-const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
+const SprintStats = ({ requests }) => {
+    return (
+        <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-purple-50 rounded-xl p-4 border border-purple-100 flex items-center justify-between">
+                <div>
+                    <div className="text-2xl font-black text-purple-700">{requests.stats.expert}</div>
+                    <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Active Experts</div>
+                </div>
+                <MessageCircle className="text-purple-200" size={32} />
+            </div>
+            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100 flex items-center justify-between">
+                <div>
+                    <div className="text-2xl font-black text-blue-700">{requests.stats.masterclass}</div>
+                    <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Masterclasses</div>
+                </div>
+                <GraduationCap className="text-blue-200" size={32} />
+            </div>
+            <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 flex items-center justify-between">
+                <div>
+                    <div className="text-2xl font-black text-amber-700">{requests.stats.knowledgePack}</div>
+                    <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Knowledge Packs</div>
+                </div>
+                <Box className="text-amber-200" size={32} />
+            </div>
+        </div>
+    );
+};
+
+const ActionCenterView = ({ cards, isConsultant, onUpdateStatus, sprintStatus, onUpdateSprintStatus }) => {
+
+    // 1. Flatten all actions
+    const allActions = useMemo(() => {
+        let actions = [];
+        cards.forEach(card => {
+            if (card.subActions) {
+                card.subActions.forEach(action => {
+                    actions.push({
+                        ...action,
+                        cardTitle: card.item, // Parent Capability
+                        cardId: card.id,
+                        cardType: card.type, // WF or Self
+                        owner: card.owner
+                    });
+                });
+            }
+        });
+        return actions;
+    }, [cards]);
+
+    // 2. Stats
+    const stats = useMemo(() => {
+        return {
+            expert: allActions.filter(a => a.expert).length,
+            masterclass: allActions.filter(a => a.masterclass).length,
+            knowledgePack: allActions.filter(a => a.knowledgePack).length
+        }
+    }, [allActions]);
+
+    const isLocked = sprintStatus === 'Locked';
+
+    // Group by Status for Kanban
+    const columns = {
+        'Not Started': allActions.filter(a => !a.status || a.status === 'Not Started'),
+        'In Progress': allActions.filter(a => a.status === 'In Progress'),
+        'Completed': allActions.filter(a => a.status === 'Completed')
+    };
+
+    return (
+        <div className="space-y-8 pb-20">
+            {/* Header Stats */}
+            <SprintStats requests={{ stats }} />
+
+            <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Sprint Execution Board</h2>
+                    <p className="text-sm text-gray-500">Track and update the status of every action item.</p>
+                </div>
+
+                {/* SPRINT LOCK CONTROLS */}
+                {isConsultant ? (
+                    <div className="flex items-center gap-3">
+                        {sprintStatus !== 'Locked' ? (
+                            <button
+                                onClick={() => onUpdateSprintStatus('Locked')} // Actually "Sent" but user implies Lock logic
+                                className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
+                            >
+                                <Send size={16} /> Send Sprint to Client
+                            </button>
+                        ) : (
+                            <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
+                                <ShieldCheck size={16} /> Sprint Locked & Progressing
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    // User View
+                    <div className="flex items-center gap-3">
+                        {sprintStatus === 'SentToUser' ? ( // Assuming we use this state
+                            <button
+                                onClick={() => onUpdateSprintStatus('Locked')}
+                                className="px-6 py-2 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center gap-2 animate-pulse"
+                            >
+                                <Check size={16} /> Accept Sprint Plan
+                            </button>
+                        ) : sprintStatus === 'Locked' ? (
+                            <span className="px-4 py-2 bg-green-50 text-green-700 font-bold rounded-xl flex items-center gap-2 border border-green-200">
+                                <ShieldCheck size={16} /> Sprint Accepted
+                            </span>
+                        ) : (
+                            <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
+                                <Wand2 size={16} /> Designing Sprint...
+                            </span>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* KANBAN BOARD */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {Object.entries(columns).map(([colName, items]) => (
+                    <div key={colName} className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100 flex flex-col h-full min-h-[500px]">
+                        <div className={`flex justify-between items-center mb-4 px-2 pb-3 border-b border-gray-100 ${colName === 'Completed' ? 'border-green-200' :
+                            colName === 'In Progress' ? 'border-amber-200' : 'border-gray-200'
+                            }`}>
+                            <h3 className="font-bold text-gray-700 uppercase tracking-wider text-xs flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${colName === 'Completed' ? 'bg-green-500' :
+                                    colName === 'In Progress' ? 'bg-amber-500' : 'bg-gray-400'
+                                    }`}></div>
+                                {colName}
+                            </h3>
+                            <span className="bg-white px-2 py-0.5 rounded-md text-[10px] font-bold text-gray-400 border border-gray-200 shadow-sm">
+                                {items.length}
+                            </span>
+                        </div>
+
+                        <div className="flex-1 space-y-3">
+                            {items.length === 0 && (
+                                <div className="h-32 flex items-center justify-center text-gray-300 text-xs italic border-2 border-dashed border-gray-200 rounded-xl">
+                                    No items
+                                </div>
+                            )}
+                            {items.map(action => (
+                                <div key={action.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 group hover:shadow-md transition-all">
+
+                                    {/* Card Tags */}
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${action.cardType === 'WF' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                                            }`}>
+                                            {action.cardType}
+                                        </span>
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase truncate max-w-[120px]" title={action.cardTitle}>
+                                            {action.cardTitle}
+                                        </span>
+                                    </div>
+
+                                    <div className="text-sm font-bold text-gray-900 mb-3 leading-snug">
+                                        {action.text}
+                                    </div>
+
+                                    {/* Resources Icons */}
+                                    <div className="flex gap-1 mb-4">
+                                        {action.expert && <div className="p-1 bg-purple-50 text-purple-600 rounded" title="Expert"><MessageCircle size={10} /></div>}
+                                        {action.masterclass && <div className="p-1 bg-blue-50 text-blue-600 rounded" title="Masterclass"><GraduationCap size={10} /></div>}
+                                        {action.knowledgePack && <div className="p-1 bg-amber-50 text-amber-600 rounded" title="Knowledge Pack"><Box size={10} /></div>}
+                                    </div>
+
+                                    {/* Actions */}
+                                    {isConsultant ? (
+                                        <div className="flex justify-between items-center pt-3 border-t border-gray-50">
+                                            {/* Move Left */}
+                                            {colName !== 'Not Started' ? (
+                                                <button
+                                                    onClick={() => onUpdateStatus(action.cardId, action.id, colName === 'Completed' ? 'In Progress' : 'Not Started')}
+                                                    className="text-gray-400 hover:text-gray-600 text-[10px] font-bold uppercase flex items-center gap-1"
+                                                >
+                                                    ← Back
+                                                </button>
+                                            ) : <div></div>}
+
+                                            {/* Move Right */}
+                                            {colName !== 'Completed' ? (
+                                                <button
+                                                    onClick={() => onUpdateStatus(action.cardId, action.id, colName === 'Not Started' ? 'In Progress' : 'Completed')}
+                                                    className="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold uppercase flex items-center gap-1 bg-indigo-50 px-2 py-1 rounded-md"
+                                                >
+                                                    Move to {colName === 'Not Started' ? 'In Progress' : 'Completed'} →
+                                                </button>
+                                            ) : (
+                                                <div className="text-green-600 text-[10px] font-bold uppercase flex items-center gap-1">
+                                                    <CheckCircle size={12} /> Done
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        // User View (Read Only Status)
+                                        <div className="pt-2 border-t border-gray-50 text-right">
+                                            <span className={`text-[10px] font-bold uppercase ${action.status === 'Completed' ? 'text-green-600' :
+                                                action.status === 'In Progress' ? 'text-amber-600' : 'text-gray-400'
+                                                }`}>
+                                                {action.status || 'Pending'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+const ActionPlanPanel = ({ card, profile, onClose, onSave, isLocked, isConsultant }) => {
     // Local state for form fields
     const [dueDate, setDueDate] = useState(card.dueDate || '');
     const [owner, setOwner] = useState(card.owner || '');
@@ -953,8 +1179,15 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
 
     const [aiLoading, setAiLoading] = useState(false);
 
-    // AI Helper
+    // AI Helper (Only Viewable/Actionable if NOT Locked or if Consultant overrides - usually locked means frozen scope)
+    // Actually, consultant can probably still edit, but user cannot.
+    const canEdit = isConsultant; // Consultant has power to edit even if locked (Change request), but let's stick to request "SME should not change status" implies SME is read only mostly.
+    // Spec: "User (SME) should able to see actions and not change the status"
+    // Spec: "WF Sprint Locks once sent by consultant to user accepets the sprint"
+    // Assuming Consultant defines, User accepts. Once accepted, can Consultant edit? Likely yes, to manage it.
+
     const generatePlanWithAI = async () => {
+        if (!canEdit) return;
         setAiLoading(true);
         try {
             const prompt = `
@@ -1005,7 +1238,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                     text: act.text,
                     masterclass: act.masterclass || false,
                     expert: act.expert || false,
-                    knowledgePack: act.knowledge_pack || false
+                    knowledgePack: act.knowledge_pack || false,
+                    status: 'Not Started' // Default status
                 }));
                 setSubActions(newActions);
             }
@@ -1018,6 +1252,7 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
     };
 
     const handleSave = () => {
+        if (!canEdit) return;
         onSave({
             dueDate,
             owner,
@@ -1026,7 +1261,6 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
             objectives,
             subActions
         });
-        // Optional toast here
     };
 
     // Sub Action Handlers
@@ -1036,7 +1270,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
             text: "",
             masterclass: false,
             expert: false,
-            knowledgePack: false
+            knowledgePack: false,
+            status: 'Not Started'
         }]);
     };
 
@@ -1077,7 +1312,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                 <input
                                     type="date"
                                     value={dueDate}
-                                    onChange={(e) => setDueDate(e.target.value)}
+                                    onChange={(e) => canEdit && setDueDate(e.target.value)}
+                                    readOnly={!canEdit}
                                     className="text-xs font-bold text-gray-700 outline-none bg-transparent uppercase cursor-pointer"
                                 />
                             </div>
@@ -1086,7 +1322,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                 <input
                                     type="text"
                                     value={owner}
-                                    onChange={(e) => setOwner(e.target.value)}
+                                    onChange={(e) => canEdit && setOwner(e.target.value)}
+                                    readOnly={!canEdit}
                                     placeholder="Assign Owner..."
                                     className="text-xs font-bold text-gray-700 outline-none bg-transparent w-full"
                                 />
@@ -1108,14 +1345,16 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                 <Target size={16} className="text-red-600" />
                                 Strategic Context
                             </h3>
-                            <button
-                                onClick={generatePlanWithAI}
-                                disabled={aiLoading}
-                                className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-2 transition-all disabled:opacity-50"
-                            >
-                                {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                                {aiLoading ? 'Analyzing...' : 'Auto-Generate with AI'}
-                            </button>
+                            {canEdit && (
+                                <button
+                                    onClick={generatePlanWithAI}
+                                    disabled={aiLoading}
+                                    className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    {aiLoading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                    {aiLoading ? 'Analyzing...' : 'Auto-Generate with AI'}
+                                </button>
+                            )}
                         </div>
 
                         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4 focus-within:ring-2 focus-within:ring-red-500/10 transition-shadow">
@@ -1124,7 +1363,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                 <textarea
                                     rows={2}
                                     value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
+                                    onChange={(e) => canEdit && setDescription(e.target.value)}
+                                    readOnly={!canEdit}
                                     className="w-full text-sm text-gray-800 font-medium bg-transparent outline-none resize-none placeholder:text-gray-300"
                                     placeholder="What is this initiative about?"
                                 />
@@ -1136,7 +1376,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                     <textarea
                                         rows={3}
                                         value={context}
-                                        onChange={(e) => setContext(e.target.value)}
+                                        onChange={(e) => canEdit && setContext(e.target.value)}
+                                        readOnly={!canEdit}
                                         className="w-full text-sm text-gray-600 leading-relaxed bg-transparent outline-none resize-none placeholder:text-gray-300"
                                         placeholder="Why is this critical now?"
                                     />
@@ -1146,7 +1387,8 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                     <textarea
                                         rows={3}
                                         value={objectives}
-                                        onChange={(e) => setObjectives(e.target.value)}
+                                        onChange={(e) => canEdit && setObjectives(e.target.value)}
+                                        readOnly={!canEdit}
                                         className="w-full text-sm text-gray-600 leading-relaxed bg-transparent outline-none resize-none placeholder:text-gray-300"
                                         placeholder="What does success look like?"
                                     />
@@ -1162,19 +1404,21 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                 <Briefcase size={16} className="text-red-600" />
                                 Execution Plan
                             </h3>
-                            <button
-                                onClick={addSubAction}
-                                className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all"
-                            >
-                                <Plus size={12} /> Add Item
-                            </button>
+                            {canEdit && (
+                                <button
+                                    onClick={addSubAction}
+                                    className="text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg hover:bg-gray-200 flex items-center gap-1 transition-all"
+                                >
+                                    <Plus size={12} /> Add Item
+                                </button>
+                            )}
                         </div>
 
                         <div className="space-y-3">
                             {subActions.length === 0 && (
                                 <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                                     <p className="text-sm text-gray-400 font-medium">No actions defined yet.</p>
-                                    <button onClick={generatePlanWithAI} className="text-indigo-600 text-xs font-bold mt-2 hover:underline">Use AI to suggest actions</button>
+                                    {canEdit && <button onClick={generatePlanWithAI} className="text-indigo-600 text-xs font-bold mt-2 hover:underline">Use AI to suggest actions</button>}
                                 </div>
                             )}
 
@@ -1183,16 +1427,44 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                     <div className="flex gap-3 items-start">
                                         <div className="mt-1 text-xs font-bold text-gray-300">0{idx + 1}</div>
                                         <div className="flex-1 space-y-3">
-                                            <input
-                                                value={action.text}
-                                                onChange={(e) => updateSubAction(action.id, 'text', e.target.value)}
-                                                className="w-full text-sm font-bold text-gray-900 outline-none placeholder:text-gray-300 border-b border-transparent focus:border-gray-200 transition-colors pb-1"
-                                                placeholder="Describe the action item..."
-                                            />
+                                            <div className="flex justify-between items-start">
+                                                <input
+                                                    value={action.text}
+                                                    onChange={(e) => canEdit && updateSubAction(action.id, 'text', e.target.value)}
+                                                    readOnly={!canEdit}
+                                                    className="w-full text-sm font-bold text-gray-900 outline-none placeholder:text-gray-300 border-b border-transparent focus:border-gray-200 transition-colors pb-1 mr-2"
+                                                    placeholder="Describe the action item..."
+                                                />
+                                                {/* Status Badge / Toggle */}
+                                                <div className="flex-shrink-0">
+                                                    {isConsultant ? (
+                                                        <select
+                                                            value={action.status || 'Not Started'}
+                                                            onChange={(e) => updateSubAction(action.id, 'status', e.target.value)}
+                                                            className={`text-[9px] font-bold uppercase tracking-wider border rounded px-2 py-1 outline-none cursor-pointer ${action.status === 'Completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                    action.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                        'bg-gray-50 text-gray-500 border-gray-200'
+                                                                }`}
+                                                        >
+                                                            <option value="Not Started">Not Started</option>
+                                                            <option value="In Progress">In Progress</option>
+                                                            <option value="Completed">Completed</option>
+                                                        </select>
+                                                    ) : (
+                                                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded border ${action.status === 'Completed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                                action.status === 'In Progress' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                    'bg-gray-50 text-gray-500 border-gray-200'
+                                                            }`}>
+                                                            {action.status || 'Not Started'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
 
                                             {/* Support Toggles */}
                                             <div className="flex flex-wrap gap-2">
                                                 <button
+                                                    disabled={!canEdit}
                                                     onClick={() => updateSubAction(action.id, 'masterclass', !action.masterclass)}
                                                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.masterclass
                                                         ? 'bg-blue-50 border-blue-200 text-blue-700'
@@ -1203,6 +1475,7 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                                     Masterclass
                                                 </button>
                                                 <button
+                                                    disabled={!canEdit}
                                                     onClick={() => updateSubAction(action.id, 'expert', !action.expert)}
                                                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.expert
                                                         ? 'bg-purple-50 border-purple-200 text-purple-700'
@@ -1213,6 +1486,7 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                                     Expert
                                                 </button>
                                                 <button
+                                                    disabled={!canEdit}
                                                     onClick={() => updateSubAction(action.id, 'knowledgePack', !action.knowledgePack)}
                                                     className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider border transition-all ${action.knowledgePack
                                                         ? 'bg-amber-50 border-amber-200 text-amber-700'
@@ -1222,14 +1496,17 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                                                     <Box size={12} />
                                                     Knowledge Pack
                                                 </button>
+
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => removeSubAction(action.id)}
-                                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        {canEdit && (
+                                            <button
+                                                onClick={() => removeSubAction(action.id)}
+                                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -1243,17 +1520,20 @@ const ActionPlanPanel = ({ card, profile, onClose, onSave }) => {
                         onClick={onClose}
                         className="px-6 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors text-sm"
                     >
-                        Cancel
+                        Close
                     </button>
-                    <button
-                        onClick={handleSave}
-                        className="px-8 py-3 rounded-xl font-bold text-white bg-[#D32F2F] hover:bg-[#B71C1C] shadow-lg shadow-red-200 transition-all transform hover:scale-[1.02] flex items-center gap-2 text-sm"
-                    >
-                        <Save size={18} />
-                        Save Action Plan
-                    </button>
+                    {canEdit && (
+                        <button
+                            onClick={handleSave}
+                            className="px-8 py-3 rounded-xl font-bold text-white bg-[#D32F2F] hover:bg-[#B71C1C] shadow-lg shadow-red-200 transition-all transform hover:scale-[1.02] flex items-center gap-2 text-sm"
+                        >
+                            <Save size={18} />
+                            Save Action Plan
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
     );
 };
+
