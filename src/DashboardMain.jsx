@@ -1036,23 +1036,47 @@ const ActionCenterView = ({ cards, isConsultant, onUpdateStatus, sprintStatus, o
                 {/* SPRINT LOCK CONTROLS */}
                 {isConsultant ? (
                     <div className="flex items-center gap-3">
-                        {sprintStatus !== 'Locked' ? (
-                            <button
-                                onClick={() => onUpdateSprintStatus('Locked')} // Actually "Sent" but user implies Lock logic
-                                className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center gap-2"
-                            >
-                                <Send size={16} /> Send Sprint to Client
-                            </button>
-                        ) : (
+                        {sprintStatus === 'Locked' ? (
                             <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
                                 <ShieldCheck size={16} /> Sprint Locked & Progressing
                             </span>
+                        ) : sprintStatus === 'SentToUser' ? (
+                            <span className="px-4 py-2 bg-amber-50 text-amber-600 font-bold rounded-xl flex items-center gap-2 border border-amber-200 animate-pulse">
+                                <CheckCircle size={16} /> Pending Client Acceptance
+                            </span>
+                        ) : (
+                            // Default: Draft / Ready to Send
+                            (() => {
+                                // 3. Validate WF Cards
+                                const wfCards = cards.filter(c => c.type === 'WF');
+                                const isReadyToSend = wfCards.length > 0 && wfCards.every(c => c.subActions && c.subActions.length > 0);
+
+                                return (
+                                    <div className="flex items-center gap-3">
+                                        {!isReadyToSend && (
+                                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider text-right max-w-[150px] leading-tight">
+                                                Action plan required for all WF cards
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={() => onUpdateSprintStatus('SentToUser')}
+                                            disabled={!isReadyToSend}
+                                            className={`px-6 py-2 font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 ${isReadyToSend
+                                                    ? 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'
+                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                                }`}
+                                        >
+                                            <Send size={16} /> Send Sprint to Client
+                                        </button>
+                                    </div>
+                                );
+                            })()
                         )}
                     </div>
                 ) : (
                     // User View
                     <div className="flex items-center gap-3">
-                        {sprintStatus === 'SentToUser' ? ( // Assuming we use this state
+                        {sprintStatus === 'SentToUser' ? (
                             <button
                                 onClick={() => onUpdateSprintStatus('Locked')}
                                 className="px-6 py-2 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center gap-2 animate-pulse"
