@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import { MapPin, Briefcase, Globe, Linkedin, Save, Loader2, Sparkles, LogOut } from 'lucide-react';
+import { reliableGenerateContent, cleanAndParseJson } from './utils/aiService';
 
 // Config
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'public-anon-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 
 export default function ConsultantOnboarding() {
     const [user, setUser] = useState(null);
@@ -63,7 +63,10 @@ export default function ConsultantOnboarding() {
         }
         setScraping(true);
 
-        const prompt = `
+        try {
+            console.log("🔍 Starting consultant profile research with web search...");
+
+            const prompt = `
       Act as a professional profiler. Research the consultant based on these URLs. Priority: Official Website > LinkedIn (if accessible).
       LinkedIn: ${formData.linkedin_url}
       Website: ${formData.website_url}
@@ -81,40 +84,36 @@ export default function ConsultantOnboarding() {
       If specific data is not found, leave it blank. Return ONLY JSON.
       `;
 
-        try {
-            // Use Gemini search
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        tools: [{ google_search: {} }]
-                    })
-                }
-            );
-            const resJson = await response.json();
-            const text = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+            // CRITICAL: Enable web search for accurate consultant research
+            const rawText = await reliableGenerateContent(prompt, {
+                useSearch: true  // Enable web search grounding for factual data
+            });
 
-            if (text) {
-                const clean = text.replace(/```json/g, '').replace(/```/g, '').trim();
-                const data = JSON.parse(clean);
-                setFormData(prev => ({
-                    ...prev,
-                    name: data.name || prev.name,
-                    location: data.location || prev.location,
-                    industry_focus: data.industry_focus || prev.industry_focus,
-                    function_focus: data.function_focus || prev.function_focus,
-                    bio: data.bio || prev.bio,
-                    past_companies: data.past_companies || prev.past_companies,
-                    other_comments: data.other_comments || prev.other_comments
-                }));
-            } else {
-                console.warn("No text in Gemini response");
+            if (!rawText) {
+                throw new Error("Empty response from AI");
             }
+
+            console.log("✅ Received consultant profile data");
+            const data = cleanAndParseJson(rawText);
+
+            if (!data.name && !data.bio) {
+                throw new Error("Search returned incomplete data");
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                name: data.name || prev.name,
+                location: data.location || prev.location,
+                industry_focus: data.industry_focus || prev.industry_focus,
+                function_focus: data.function_focus || prev.function_focus,
+                bio: data.bio || prev.bio,
+                past_companies: data.past_companies || prev.past_companies,
+                other_comments: data.other_comments || prev.other_comments
+            }));
+
+            console.log("✅ Profile fields populated successfully");
         } catch (e) {
-            console.error(e);
+            console.error("❌ Consultant research failed:", e);
             alert("Auto-fill failed or timed out. Please fill manually.");
         }
         setScraping(false);
