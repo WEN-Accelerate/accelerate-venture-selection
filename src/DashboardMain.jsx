@@ -312,6 +312,30 @@ export default function DashboardMain() {
         }
     };
 
+    const handleUpdateSprintStatus = (newStatus) => {
+        // Direct Profile Update for Sprint Status
+        const newProfile = { ...profile, sprint_status: newStatus };
+        setProfile(newProfile); // Optimistic
+
+        const params = new URLSearchParams(window.location.search);
+        const viewClientId = params.get('view_client_id');
+        const targetUserId = viewClientId || user.uid;
+
+        if ((user && !user.isAnonymous) || viewClientId) {
+            supabase.from('profiles').upsert([{
+                user_id: targetUserId,
+                details: newProfile,
+                company_name: profile.company_name || profile.companyName || 'My Company',
+                updated_at: new Date()
+            }], { onConflict: 'user_id' }).then(({ error }) => {
+                if (error) console.error("Sprint Status Update Failed", error);
+                else console.log("Sprint Status Updated to:", newStatus);
+            });
+        } else {
+            localStorage.setItem('user_profile_data', JSON.stringify({ details: newProfile }));
+        }
+    };
+
     // --- RENDER HELPERS ---
 
     // Parse supportDetails into usable cards
@@ -660,6 +684,14 @@ export default function DashboardMain() {
                             </div>
                         </div>
 
+                        {/* SPRINT CONTROLS */}
+                        <SprintControls
+                            isConsultant={isConsultantView}
+                            sprintStatus={profile.sprint_status || 'Draft'}
+                            onUpdateSprintStatus={handleUpdateSprintStatus}
+                            cards={cards}
+                        />
+
                         {/* GRID */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                             {cards.map(card => (
@@ -695,37 +727,7 @@ export default function DashboardMain() {
                             cards={cards}
                             isConsultant={isConsultantView}
                             sprintStatus={profile.sprint_status || 'Draft'}
-                            onUpdateSprintStatus={(newStatus) => {
-                                // Direct Profile Update for Sprint Status
-                                const newProfile = { ...profile, sprint_status: newStatus };
-                                setProfile(newProfile); // Optimistic
-
-                                // Reuse existing update logic (hacky but works since we handle it in handleUpdateCard for metadata, 
-                                // but for root level props we need a separate handler or just use the same pattern).
-                                // handleUpdateCard only updates metadata. We need to update the root profile.
-                                // Let's define a root updater logic inline or refactor update logic below.
-
-                                // Since handleUpdateCard is cleaner, let's create `handleUpdateProfileRoot`
-                                // Or simpler: Just call the same DB update logic.
-
-                                const params = new URLSearchParams(window.location.search);
-                                const viewClientId = params.get('view_client_id');
-                                const targetUserId = viewClientId || user.uid;
-
-                                if ((user && !user.isAnonymous) || viewClientId) {
-                                    supabase.from('profiles').upsert([{
-                                        user_id: targetUserId,
-                                        details: newProfile,
-                                        company_name: profile.companyName,
-                                        updated_at: new Date()
-                                    }], { onConflict: 'user_id' }).then(({ error }) => {
-                                        if (error) console.error("Sprint Status Update Failed", error);
-                                        else console.log("Sprint Status Updated to:", newStatus);
-                                    });
-                                } else {
-                                    localStorage.setItem('user_profile_data', JSON.stringify({ details: newProfile }));
-                                }
-                            }}
+                            onUpdateSprintStatus={handleUpdateSprintStatus}
                             onUpdateStatus={(cardId, actionId, newStatus) => {
                                 // Find the card meta
                                 const cardMeta = profile.supportMetadata?.[cardId] || {};
@@ -955,6 +957,73 @@ const UserJourneyTimeline = ({ profile, cards }) => {
     );
 };
 
+const SprintControls = ({ isConsultant, sprintStatus, onUpdateSprintStatus, cards }) => {
+    return (
+        <div className="flex justify-center mb-8">
+            {isConsultant ? (
+                <div className="flex items-center gap-3">
+                    {sprintStatus === 'Locked' ? (
+                        <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
+                            <ShieldCheck size={16} /> Sprint Locked & Progressing
+                        </span>
+                    ) : sprintStatus === 'SentToUser' ? (
+                        <span className="px-4 py-2 bg-amber-50 text-amber-600 font-bold rounded-xl flex items-center gap-2 border border-amber-200 animate-pulse">
+                            <CheckCircle size={16} /> Pending Client Acceptance
+                        </span>
+                    ) : (
+                        // Default: Draft / Ready to Send
+                        (() => {
+                            // 3. Validate WF Cards
+                            const wfCards = cards.filter(c => c.type === 'WF');
+                            const isReadyToSend = wfCards.length > 0 && wfCards.every(c => c.subActions && c.subActions.length > 0);
+
+                            return (
+                                <div className="flex items-center gap-3">
+                                    {!isReadyToSend && (
+                                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider text-right max-w-[150px] leading-tight">
+                                            Action plan required for all WF cards
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={() => onUpdateSprintStatus('SentToUser')}
+                                        disabled={!isReadyToSend}
+                                        className={`px-6 py-2 font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 ${isReadyToSend
+                                            ? 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'
+                                            : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
+                                            }`}
+                                    >
+                                        <Send size={16} /> Send Sprint to Client
+                                    </button>
+                                </div>
+                            );
+                        })()
+                    )}
+                </div>
+            ) : (
+                // User View
+                <div className="flex items-center gap-3">
+                    {sprintStatus === 'SentToUser' ? (
+                        <button
+                            onClick={() => onUpdateSprintStatus('Locked')}
+                            className="px-6 py-2 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center gap-2 animate-pulse"
+                        >
+                            <Check size={16} /> Accept Sprint Plan
+                        </button>
+                    ) : sprintStatus === 'Locked' ? (
+                        <span className="px-4 py-2 bg-green-50 text-green-700 font-bold rounded-xl flex items-center gap-2 border border-green-200">
+                            <ShieldCheck size={16} /> Sprint Accepted
+                        </span>
+                    ) : (
+                        <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
+                            <Wand2 size={16} /> Designing Sprint...
+                        </span>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const SprintStats = ({ requests }) => {
     return (
         <div className="grid grid-cols-3 gap-4 mb-8">
@@ -1033,67 +1102,7 @@ const ActionCenterView = ({ cards, isConsultant, onUpdateStatus, sprintStatus, o
                     <p className="text-sm text-gray-500">Track and update the status of every action item.</p>
                 </div>
 
-                {/* SPRINT LOCK CONTROLS */}
-                {isConsultant ? (
-                    <div className="flex items-center gap-3">
-                        {sprintStatus === 'Locked' ? (
-                            <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
-                                <ShieldCheck size={16} /> Sprint Locked & Progressing
-                            </span>
-                        ) : sprintStatus === 'SentToUser' ? (
-                            <span className="px-4 py-2 bg-amber-50 text-amber-600 font-bold rounded-xl flex items-center gap-2 border border-amber-200 animate-pulse">
-                                <CheckCircle size={16} /> Pending Client Acceptance
-                            </span>
-                        ) : (
-                            // Default: Draft / Ready to Send
-                            (() => {
-                                // 3. Validate WF Cards
-                                const wfCards = cards.filter(c => c.type === 'WF');
-                                const isReadyToSend = wfCards.length > 0 && wfCards.every(c => c.subActions && c.subActions.length > 0);
-
-                                return (
-                                    <div className="flex items-center gap-3">
-                                        {!isReadyToSend && (
-                                            <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider text-right max-w-[150px] leading-tight">
-                                                Action plan required for all WF cards
-                                            </span>
-                                        )}
-                                        <button
-                                            onClick={() => onUpdateSprintStatus('SentToUser')}
-                                            disabled={!isReadyToSend}
-                                            className={`px-6 py-2 font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 ${isReadyToSend
-                                                    ? 'bg-indigo-600 text-white shadow-indigo-200 hover:bg-indigo-700'
-                                                    : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
-                                                }`}
-                                        >
-                                            <Send size={16} /> Send Sprint to Client
-                                        </button>
-                                    </div>
-                                );
-                            })()
-                        )}
-                    </div>
-                ) : (
-                    // User View
-                    <div className="flex items-center gap-3">
-                        {sprintStatus === 'SentToUser' ? (
-                            <button
-                                onClick={() => onUpdateSprintStatus('Locked')}
-                                className="px-6 py-2 bg-green-600 text-white font-bold rounded-xl shadow-lg shadow-green-200 hover:bg-green-700 transition-all flex items-center gap-2 animate-pulse"
-                            >
-                                <Check size={16} /> Accept Sprint Plan
-                            </button>
-                        ) : sprintStatus === 'Locked' ? (
-                            <span className="px-4 py-2 bg-green-50 text-green-700 font-bold rounded-xl flex items-center gap-2 border border-green-200">
-                                <ShieldCheck size={16} /> Sprint Accepted
-                            </span>
-                        ) : (
-                            <span className="px-4 py-2 bg-gray-100 text-gray-500 font-bold rounded-xl flex items-center gap-2 border border-gray-200">
-                                <Wand2 size={16} /> Designing Sprint...
-                            </span>
-                        )}
-                    </div>
-                )}
+                {/* SPRINT LOCK CONTROLS MOVED TO SPRINT PAGE */}
             </div>
 
             {/* KANBAN BOARD */}

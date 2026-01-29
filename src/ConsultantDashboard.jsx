@@ -233,10 +233,10 @@ function ClientCard({ client }) {
                     </div>
                 </div>
                 <div className={`px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${sprintStatus === 'Locked'
-                        ? 'bg-green-50 border-green-200 text-green-700'
-                        : sprintStatus === 'SentToUser'
-                            ? 'bg-amber-50 border-amber-200 text-amber-700'
-                            : 'bg-gray-50 border-gray-200 text-gray-500'
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : sprintStatus === 'SentToUser'
+                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-500'
                     }`}>
                     {sprintStatus === 'Locked' ? 'Sprint Active' : sprintStatus === 'SentToUser' ? 'Pending Acceptance' : 'Planning Phase'}
                 </div>
@@ -252,7 +252,7 @@ function ClientCard({ client }) {
             <div className="space-y-4">
                 <div>
                     <div className="flex justify-between text-[10px] font-bold text-gray-500 uppercase mb-1">
-                        <span>Strategy Progress</span>
+                        <span>Journey Status</span>
                         <span>{progress}%</span>
                     </div>
                     <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
