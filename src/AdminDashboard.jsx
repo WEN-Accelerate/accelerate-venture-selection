@@ -4,7 +4,7 @@ import netlifyIdentity from 'netlify-identity-widget';
 import {
     LayoutDashboard, Building2, Users, Briefcase, Settings, LogOut,
     Plus, Trash2, Edit2, Search, ArrowRight, TrendingUp, AlertCircle, CheckCircle,
-    UserPlus, Shield, ExternalLink, Mail, Filter
+    UserPlus, Shield, ExternalLink, Mail, Filter, BookOpen, UserCheck, Calculator, Hash
 } from 'lucide-react';
 
 // Config
@@ -14,7 +14,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function AdminDashboard() {
     const [user, setUser] = useState(null);
-    const [view, setView] = useState('overview'); // overview, companies, consultants, sprints
+    const [view, setView] = useState('overview'); // overview, companies, consultants, sprints, users, knowledge
     const [loading, setLoading] = useState(true);
 
     // Data States
@@ -22,6 +22,10 @@ export default function AdminDashboard() {
     const [consultants, setConsultants] = useState([]);
     const [quarterlyProgress, setQuarterlyProgress] = useState([]);
     const [stats, setStats] = useState({ revenue: 0, companies: 0, consultants: 0, hubs: 0 });
+
+    // Derived States for new tables
+    const [allUsers, setAllUsers] = useState([]);
+    const [knowledgeBase, setKnowledgeBase] = useState([]);
 
     // Modals
     const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
@@ -36,6 +40,11 @@ export default function AdminDashboard() {
     const [selectedConsultant, setSelectedConsultant] = useState(null);
     const [assignCompanyId, setAssignCompanyId] = useState('');
     const [assignments, setAssignments] = useState([]);
+
+    // New: User Assignment for Orphan Profiles
+    const [isUserAssignModalOpen, setIsUserAssignModalOpen] = useState(false);
+    const [targetProfileId, setTargetProfileId] = useState(null);
+    const [assignUserEmail, setAssignUserEmail] = useState('');
 
     useEffect(() => {
         netlifyIdentity.init();
@@ -75,7 +84,7 @@ export default function AdminDashboard() {
 
         // 5. Calc Stats
         const totalRev = (profs || []).reduce((acc, p) => acc + (parseFloat(p.details?.revenue) || 0), 0);
-        const hubs = new Set((profs || []).map(p => p.details?.hub)).size;
+        const hubs = new Set((profs || []).map(p => p.details?.hub).filter(Boolean)).size;
 
         setStats({
             revenue: totalRev,
@@ -83,6 +92,57 @@ export default function AdminDashboard() {
             consultants: (cons || []).length,
             hubs: hubs
         });
+
+        // 6. Aggregate Users
+        const smes = (profs || []).map(p => ({
+            id: p.user_id,
+            name: p.full_name || p.details?.companyName,
+            email: p.email,
+            role: 'SME',
+            company: p.details?.companyName,
+            created_at: p.created_at || p.updated_at
+        }));
+        const advisors = (cons || []).map(c => ({
+            id: c.id,
+            name: c.name,
+            email: c.email,
+            role: 'Consultant',
+            company: 'Wadhwani Foundation',
+            created_at: c.created_at
+        }));
+        setAllUsers([...smes, ...advisors]);
+
+        // 7. Aggregate Knowledge Base (Actions & Support)
+        let knowledge = [];
+        (profs || []).forEach(p => {
+            // Support Domains (WF/Self)
+            const supportDetails = p.details?.supportDetails || {};
+            // Actions
+            const supportMetadata = p.details?.supportMetadata || {};
+
+            // Iterate Support Details
+            Object.entries(supportDetails).forEach(([key, type]) => {
+                const [domain, subDomain] = key.split('_');
+                // Find actions for this area if any (approx match or generic bucket)
+                // Actually actions are nested in cards in supportMetadata, keyed by 'cardId'.
+                // We need to just list everything.
+
+                knowledge.push({
+                    company: p.details?.companyName,
+                    hub: p.details?.hub,
+                    domain,
+                    subDomain,
+                    type, // WF or Self
+                    resources: type === 'WF' ? ['Expert', 'Masterclass', 'Knowledge Pack'] : [], // Mock based on type
+                });
+            });
+
+            // Iterate Actual Actions from Cards
+            // If we have card data structure:
+            // p.details.supportMetadata is map of cardId -> { subActions: [] }
+            // But we might need to look deeper. Let's assume standard structure used in DashboardMain.
+        });
+        setKnowledgeBase(knowledge);
 
         setLoading(false);
     };
@@ -113,18 +173,22 @@ export default function AdminDashboard() {
                 // Update
                 const { error } = await supabase
                     .from('profiles')
-                    .update({ details: { ...editingCompany.details, ...companyForm } })
+                    .update({
+                        details: { ...editingCompany.details, ...companyForm },
+                        // Also update root fields if they changed
+                        email: companyForm.email || editingCompany.email
+                    })
                     .eq('id', editingCompany.id);
                 if (error) throw error;
             } else {
-                // Create New (Requires a user_id placeholder usually, but we can try inserting just header data if table allows nullable user_id or we generate a dummy one)
-                // For this demo, let's assume we create a profile with a random UUID for user_id to unlink it from auth for now until claimed?
-                // Or better: Create a new profile row.
+                // Create New
                 const dummyId = crypto.randomUUID();
                 const { error } = await supabase.from('profiles').insert([{
                     user_id: dummyId,
                     details: companyForm,
-                    email: companyForm.email || `temp_${Date.now()}@example.com`
+                    email: companyForm.email || `temp_${Date.now()}@example.com`,
+                    full_name: companyForm.companyName,
+                    company_name: companyForm.companyName
                 }]);
                 if (error) throw error;
             }
@@ -142,6 +206,34 @@ export default function AdminDashboard() {
         if (error) alert("Error: " + error.message);
         else fetchData();
     };
+
+    // New: User Assignment Logic
+    const handleOpenUserAssign = (profile) => {
+        setTargetProfileId(profile.id); // Profile Row ID, not user_id
+        setAssignUserEmail(profile.email || '');
+        setIsUserAssignModalOpen(true);
+    }
+
+    const handleAssignUserToProfile = async () => {
+        if (!targetProfileId || !assignUserEmail) return;
+
+        // We fundamentally update the email. The User ID is hard to update without auth admin API.
+        // But updating email allows the user to claim it if we use email matching logic elsewhere.
+        // For now, let's update email.
+
+        try {
+            const { error } = await supabase.from('profiles')
+                .update({ email: assignUserEmail })
+                .eq('id', targetProfileId);
+
+            if (error) throw error;
+            alert("User email updated for profile.");
+            setIsUserAssignModalOpen(false);
+            fetchData();
+        } catch (e) {
+            alert("Error updating user: " + e.message);
+        }
+    }
 
     // --- CONSULTANT ACTIONS ---
 
@@ -213,18 +305,20 @@ export default function AdminDashboard() {
     return (
         <div className="flex h-screen bg-gray-100 font-sans">
             {/* Sidebar */}
-            <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+            <div className="flex-shrink-0 w-64 bg-white border-r border-gray-200 flex flex-col">
                 <div className="p-6 border-b border-gray-100">
                     <div className="flex items-center gap-2 text-indigo-700 font-bold text-xl tracking-tight">
                         <Shield size={24} /> Super Admin
                     </div>
                 </div>
 
-                <nav className="flex-1 py-6">
+                <nav className="flex-1 py-6 overflow-y-auto">
                     <TabButton id="overview" label="Overview" icon={LayoutDashboard} />
                     <TabButton id="companies" label="Companies" icon={Building2} />
                     <TabButton id="consultants" label="Consultants" icon={Users} />
                     <TabButton id="sprints" label="Sprints & Progress" icon={TrendingUp} />
+                    <TabButton id="users" label="User Management" icon={UserCheck} />
+                    <TabButton id="knowledge" label="Knowledge Base" icon={BookOpen} />
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
@@ -273,41 +367,70 @@ export default function AdminDashboard() {
                             </div>
 
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                <table className="w-full text-left">
-                                    <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
-                                        <tr>
-                                            <th className="px-6 py-4">Company Name</th>
-                                            <th className="px-6 py-4">Industry</th>
-                                            <th className="px-6 py-4">Revenue</th>
-                                            <th className="px-6 py-4">Location</th>
-                                            <th className="px-6 py-4">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {profiles.map(p => (
-                                            <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 font-bold text-gray-900 group relative">
-                                                    {p.details?.companyName || 'Untitled'}
-                                                    <div className="text-[10px] text-gray-300 font-mono hidden group-hover:block absolute top-1 left-6">{p.id}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{p.details?.industry || '-'}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-900 font-mono">₹{p.details?.revenue || '0'}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-600">{p.details?.location || '-'}</td>
-                                                <td className="px-6 py-4 flex items-center gap-2">
-                                                    <button onClick={() => window.open(`/dashboard.html?view_client_id=${p.user_id}`, '_blank')} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg" title="View Dashboard">
-                                                        <ExternalLink size={16} />
-                                                    </button>
-                                                    <button onClick={() => handleEditCompany(p)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg" title="Edit">
-                                                        <Edit2 size={16} />
-                                                    </button>
-                                                    <button onClick={() => handleDeleteCompany(p.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left min-w-[1000px]">
+                                        <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
+                                            <tr>
+                                                <th className="px-6 py-4">Company Name</th>
+                                                <th className="px-6 py-4">Hub</th>
+                                                <th className="px-6 py-4">Consultant</th>
+                                                <th className="px-6 py-4">SME User</th>
+                                                <th className="px-6 py-4">Revenue</th>
+                                                <th className="px-6 py-4">Actions</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {profiles.map(p => {
+                                                // Find Assigned Consultant
+                                                const assign = assignments.find(a => a.client_profile_id === p.user_id);
+                                                const consultant = consultants.find(c => c.email === assign?.consultant_email);
+
+                                                return (
+                                                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="px-6 py-4 font-bold text-gray-900 group relative">
+                                                            {p.details?.companyName || 'Untitled'}
+                                                            <div className="text-[10px] text-gray-300 font-mono hidden group-hover:block absolute top-1 left-6">{p.id}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">{p.details?.hub || '-'}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900">
+                                                            {consultant ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                                                                        {consultant.name?.charAt(0)}
+                                                                    </div>
+                                                                    {consultant.name}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-400 italic">Unassigned</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-semibold">{p.full_name || 'Guest User'}</span>
+                                                                <span className="text-xs text-gray-500">{p.email || 'No Email'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-900 font-mono">₹{p.details?.revenue || '0'}</td>
+                                                        <td className="px-6 py-4 flex items-center gap-2">
+                                                            <button onClick={() => window.open(`/dashboard.html?view_client_id=${p.user_id}`, '_blank')} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg" title="View Dashboard">
+                                                                <ExternalLink size={16} />
+                                                            </button>
+                                                            <button onClick={() => handleOpenUserAssign(p)} className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg" title="Assign User">
+                                                                <UserCheck size={16} />
+                                                            </button>
+                                                            <button onClick={() => handleEditCompany(p)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg" title="Edit">
+                                                                <Edit2 size={16} />
+                                                            </button>
+                                                            <button onClick={() => handleDeleteCompany(p.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -388,56 +511,224 @@ export default function AdminDashboard() {
                             </div>
 
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                <table className="w-full text-left">
-                                    <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
-                                        <tr>
-                                            <th className="px-6 py-4">Company</th>
-                                            <th className="px-6 py-4">Quarter</th>
-                                            <th className="px-6 py-4">Strategy Status</th>
-                                            <th className="px-6 py-4">Revenue (Act)</th>
-                                            <th className="px-6 py-4">Jobs (Act)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {/* Join Profile Data with Quarterly Progress */}
-                                        {profiles.map(p => {
-                                            // Find Q1 stats for this company
-                                            const q1 = quarterlyProgress.find(q => q.company_profile_id === p.id && q.quarter_label.includes('Q1')) || {};
-                                            const status = q1.strategy_status || 'Pending';
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left min-w-[1200px]">
+                                        <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
+                                            <tr>
+                                                <th className="px-6 py-4">Company</th>
+                                                <th className="px-6 py-4">Venture Type</th>
+                                                <th className="px-6 py-4">Revenue (Curr)</th>
+                                                <th className="px-6 py-4">Target (4Y)</th>
+                                                <th className="px-6 py-4">Status (% Journey)</th>
+                                                <th className="px-6 py-4">Jobs (Curr)</th>
+                                                <th className="px-6 py-4">Strategy Status</th>
+                                                <th className="px-6 py-4">Sprint Status</th>
+                                                <th className="px-6 py-4">Segment</th>
+                                                <th className="px-6 py-4">Hub</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {profiles.map(p => {
+                                                // Find Q1 stats for this company (mock logic or actual)
+                                                const q1 = quarterlyProgress.find(q => q.company_profile_id === p.id && q.quarter_label.includes('Q1')) || {};
+                                                const strategyStatus = q1.strategy_status || 'Pending';
 
-                                            // Only show if filtered? Showing all for now
-                                            return (
-                                                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                                                    <td className="px-6 py-4">
-                                                        <div className="font-bold text-gray-900">{p.details?.companyName || 'Untitled'}</div>
-                                                        <div className="text-xs text-gray-500">{p.details?.industry}</div>
+                                                // Calculate Journey Status (Same Logic as Consultant Card)
+                                                const data = p.details || {};
+                                                const fields = ['companyName', 'industry', 'revenue', 'employees', 'strategyDescription'];
+                                                const filled = fields.filter(f => data[f]).length;
+                                                const journeyProgress = Math.round((filled / fields.length) * 100);
+
+                                                return (
+                                                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="px-6 py-4">
+                                                            <div className="font-bold text-gray-900">{p.details?.companyName || 'Untitled'}</div>
+                                                            <div className="text-xs text-gray-500">{p.details?.industry}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">{p.details?.ventureType || '-'}</td>
+                                                        <td className="px-6 py-4 text-sm font-mono">₹{p.details?.revenue || '0'} Cr</td>
+                                                        <td className="px-6 py-4 text-sm font-mono">₹{p.details?.growthTarget || '0'} Cr</td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="w-full bg-gray-100 rounded-full h-1.5 w-20">
+                                                                <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${journeyProgress}%` }}></div>
+                                                            </div>
+                                                            <div className="text-[10px] font-bold text-gray-500 mt-1">{journeyProgress}%</div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">{p.details?.employees || '0'}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 w-fit ${strategyStatus === 'Green' ? 'bg-emerald-100 text-emerald-700' :
+                                                                strategyStatus === 'Amber' ? 'bg-orange-100 text-orange-700' :
+                                                                    strategyStatus === 'Red' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'
+                                                                }`}>
+                                                                {strategyStatus === 'Green' ? <CheckCircle size={10} /> : strategyStatus === 'Red' ? <AlertCircle size={10} /> : null}
+                                                                {strategyStatus}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 rounded border text-[10px] font-bold uppercase ${p.details?.sprint_status === 'Locked' ? 'bg-green-50 border-green-200 text-green-700' :
+                                                                p.details?.sprint_status === 'SentToUser' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                                                                    'bg-gray-50 border-gray-200 text-gray-500'
+                                                                }`}>
+                                                                {p.details?.sprint_status === 'Locked' ? 'Active' : p.details?.sprint_status === 'SentToUser' ? 'Pending' : 'Draft'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${p.details?.segment === 'Select' ? 'bg-purple-100 text-purple-700' :
+                                                                p.details?.segment === 'Core' ? 'bg-blue-100 text-blue-700' :
+                                                                    'bg-gray-100 text-gray-600'
+                                                                }`}>
+                                                                {p.details?.segment || 'Prime'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">{p.details?.hub || '-'}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW: USERS */}
+                    {view === 'users' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 text-lg">Platform Users</h3>
+                                    <p className="text-gray-500 text-sm">Managing {allUsers.length} active accounts (SMEs & Advisors).</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
+                                            <tr>
+                                                <th className="px-6 py-4">Name</th>
+                                                <th className="px-6 py-4">Email</th>
+                                                <th className="px-6 py-4">Role</th>
+                                                <th className="px-6 py-4">Linked Entity</th>
+                                                <th className="px-6 py-4">Joined Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {allUsers.map((u, i) => (
+                                                <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-gray-900 flex items-center gap-3">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${u.role === 'SME' ? 'bg-orange-100 text-orange-600' : 'bg-purple-100 text-purple-600'}`}>
+                                                            {u.name?.charAt(0)}
+                                                        </div>
+                                                        {u.name || 'Unknown'}
                                                     </td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600 font-medium">Q1 2025</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{u.email}</td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase flex items-center gap-1 w-fit ${status === 'Green' ? 'bg-emerald-100 text-emerald-700' :
-                                                            status === 'Amber' ? 'bg-orange-100 text-orange-700' :
-                                                                status === 'Red' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'
-                                                            }`}>
-                                                            {status === 'Green' ? <CheckCircle size={10} /> : status === 'Red' ? <AlertCircle size={10} /> : null}
-                                                            {status}
+                                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${u.role === 'SME' ? 'bg-orange-50 text-orange-600 border border-orange-100' : 'bg-purple-50 text-purple-600 border border-purple-100'}`}>
+                                                            {u.role}
                                                         </span>
                                                     </td>
-                                                    <td className="px-6 py-4 text-sm font-mono font-semibold">
-                                                        {q1.revenue_actual ? `₹${q1.revenue_actual} Cr` : '-'}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-sm font-mono font-semibold">
-                                                        {q1.jobs_actual ? `+${q1.jobs_actual}` : '-'}
-                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">{u.company || '-'}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* VIEW: KNOWLEDGE BASE */}
+                    {view === 'knowledge' && (
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 text-lg">Knowledge & Support</h3>
+                                    <p className="text-gray-500 text-sm">Aggregated view of support needs and resource allocation.</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="bg-white border border-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-gray-50">
+                                        <Filter size={16} /> Filter: WF Direct Support
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 border-b border-gray-100 text-xs uppercase text-gray-400 font-bold tracking-wider">
+                                            <tr>
+                                                <th className="px-6 py-4">Company</th>
+                                                <th className="px-6 py-4">Hub</th>
+                                                <th className="px-6 py-4">Domain</th>
+                                                <th className="px-6 py-4">Need / Action</th>
+                                                <th className="px-6 py-4">Support Type</th>
+                                                <th className="px-6 py-4">Resources</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {knowledgeBase.length === 0 ? (
+                                                <tr><td colSpan="6" className="p-8 text-center text-gray-400">No data available yet.</td></tr>
+                                            ) : (
+                                                knowledgeBase.map((k, i) => (
+                                                    <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="px-6 py-4 font-bold text-gray-900 text-sm">{k.company}</td>
+                                                        <td className="px-6 py-4 text-xs text-gray-500">{k.hub}</td>
+                                                        <td className="px-6 py-4 text-sm font-semibold text-indigo-700">{k.domain}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-700">{k.subDomain}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${k.type === 'WF' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-gray-100 text-gray-500'}`}>
+                                                                {k.type}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            {k.resources.length > 0 ? (
+                                                                <div className="flex gap-1">
+                                                                    {k.resources.map(r => (
+                                                                        <span key={r} className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[9px] font-bold uppercase border border-green-200 rounded">{r}</span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : <span className="text-gray-400 text-xs">-</span>}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* User Assign Modal */}
+            {isUserAssignModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Assign User to Profile</h3>
+                        <p className="text-xs text-gray-500 mb-4">Enter the email address of the registered user to map this profile to.</p>
+
+                        <div className="mb-6">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">User Email</label>
+                            <input
+                                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl"
+                                value={assignUserEmail}
+                                onChange={e => setAssignUserEmail(e.target.value)}
+                                placeholder="user@example.com"
+                            />
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setIsUserAssignModalOpen(false)} className="px-4 py-2 rounded-xl font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
+                            <button onClick={handleAssignUserToProfile} className="px-5 py-2 rounded-xl font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-lg shadow-amber-200">
+                                Update User
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Invite Modal */}
             {isInviteModalOpen && (

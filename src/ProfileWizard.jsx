@@ -518,9 +518,8 @@ export default function ProfileWizard() {
         `;
 
         try {
-            const raw = await callGemini(prompt);
-            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(clean);
+            const raw = await reliableGenerateContent(prompt);
+            const data = cleanAndParseJson(raw);
 
             setProfile(prev => ({
                 ...prev,
@@ -569,9 +568,8 @@ export default function ProfileWizard() {
         `;
 
         try {
-            const raw = await callGemini(prompt);
-            const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-            const data = JSON.parse(clean);
+            const raw = await reliableGenerateContent(prompt);
+            const data = cleanAndParseJson(raw);
 
             setProfile(prev => ({
                 ...prev,
