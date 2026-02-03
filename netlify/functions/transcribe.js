@@ -6,7 +6,6 @@ export default async (req, context) => {
     }
 
     try {
-        // Check all possible environment variable names for the key
         const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || process.env.GOOGLE_API_KEY;
 
         if (!apiKey) {
@@ -22,7 +21,12 @@ export default async (req, context) => {
         const base64Audio = Buffer.from(audioBuffer).toString('base64');
 
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        // Updated to match project's AI Service model version (2026 context)
+        // Falling back to known stable versions if newer ones fail is a good strategy, 
+        // but here we attempt to align with the codebase's "gemini-2.5-flash".
+        // If that fails, the user might need to check available models via ListModels.
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const result = await model.generateContent([
             "Please provide a verbatim transcription of this audio file. Do not add any introductory text or markdown formatting, just the text content.",
@@ -42,6 +46,7 @@ export default async (req, context) => {
 
     } catch (error) {
         console.error("Transcription error:", error);
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        // Provide detailed error to client
+        return new Response(JSON.stringify({ error: `AI Model Error: ${error.message}` }), { status: 500 });
     }
 };
