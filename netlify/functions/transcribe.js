@@ -6,7 +6,9 @@ export default async (req, context) => {
     }
 
     try {
-        const apiKey = process.env.VITE_GOOGLE_API_KEY || process.env.GOOGLE_API_KEY;
+        // Check all possible environment variable names for the key
+        const apiKey = process.env.VITE_GEMINI_API_KEY || process.env.VITE_GOOGLE_API_KEY || process.env.GOOGLE_API_KEY;
+
         if (!apiKey) {
             console.error("API Key is missing in environment variables.");
             return new Response(JSON.stringify({ error: "Server configuration error: API Key missing" }), { status: 500 });
