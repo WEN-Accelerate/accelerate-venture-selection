@@ -29,6 +29,7 @@ const BRAND_COLORS = {
 
 // --- AI HELPER ---
 import { reliableGenerateContent, cleanAndParseJson } from './utils/aiService';
+import { AudioRecorder } from './components/AudioRecorder';
 
 // --- RENDER HELPERS ---
 // Moved outside to prevent re-render focus loss
@@ -1003,13 +1004,18 @@ export default function ProfileWizard() {
                                 </div>
                             </div>
 
-                            <textarea
-                                rows={8}
-                                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono text-sm"
-                                placeholder="Paste transcript here..."
-                                value={transcriptStrategy}
-                                onChange={e => setTranscriptStrategy(e.target.value)}
-                            />
+                            <div className="relative">
+                                <textarea
+                                    rows={8}
+                                    className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono text-sm"
+                                    placeholder="Paste transcript here... or record audio"
+                                    value={transcriptStrategy}
+                                    onChange={e => setTranscriptStrategy(e.target.value)}
+                                />
+                                <div className="absolute right-2 bottom-2">
+                                    <AudioRecorder onTranscriptionComplete={(text) => setTranscriptStrategy(prev => (prev || '') + ' ' + text)} />
+                                </div>
+                            </div>
 
                             <div className="flex gap-4 mt-6">
                                 <button
@@ -1055,7 +1061,9 @@ export default function ProfileWizard() {
                                         onChange={e => setProfile({ ...profile, strategyDescription: e.target.value })}
                                         className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                     />
-                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                    <div className="absolute right-2 bottom-2">
+                                        <AudioRecorder onTranscriptionComplete={(text) => setProfile(prev => ({ ...prev, strategyDescription: (prev.strategyDescription || '') + ' ' + text }))} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1069,7 +1077,9 @@ export default function ProfileWizard() {
                                         onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, product: e.target.value } })}
                                         className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                     />
-                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                    <div className="absolute right-2 bottom-2">
+                                        <AudioRecorder onTranscriptionComplete={(text) => setProfile(prev => ({ ...prev, strategyDimensions: { ...prev.strategyDimensions, product: (prev.strategyDimensions.product || '') + ' ' + text } }))} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1083,7 +1093,9 @@ export default function ProfileWizard() {
                                         onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, proposition: e.target.value } })}
                                         className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                     />
-                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                    <div className="absolute right-2 bottom-2">
+                                        <AudioRecorder onTranscriptionComplete={(text) => setProfile(prev => ({ ...prev, strategyDimensions: { ...prev.strategyDimensions, proposition: (prev.strategyDimensions.proposition || '') + ' ' + text } }))} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1097,7 +1109,9 @@ export default function ProfileWizard() {
                                         onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, place: e.target.value } })}
                                         className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                     />
-                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                    <div className="absolute right-2 bottom-2">
+                                        <AudioRecorder onTranscriptionComplete={(text) => setProfile(prev => ({ ...prev, strategyDimensions: { ...prev.strategyDimensions, place: (prev.strategyDimensions.place || '') + ' ' + text } }))} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1111,7 +1125,9 @@ export default function ProfileWizard() {
                                         onChange={e => setProfile({ ...profile, strategyDimensions: { ...profile.strategyDimensions, promotion: e.target.value } })}
                                         className="w-full p-3 bg-white border border-gray-200 rounded-lg focus:border-red-500 outline-none"
                                     />
-                                    <button className="absolute right-2 bottom-2 text-gray-400 hover:text-red-600"><Mic size={16} /></button>
+                                    <div className="absolute right-2 bottom-2">
+                                        <AudioRecorder onTranscriptionComplete={(text) => setProfile(prev => ({ ...prev, strategyDimensions: { ...prev.strategyDimensions, promotion: (prev.strategyDimensions.promotion || '') + ' ' + text } }))} />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1371,13 +1387,18 @@ export default function ProfileWizard() {
                                 </div>
                             </div>
 
-                            <textarea
-                                rows={8}
-                                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono text-sm"
-                                placeholder="Paste transcript here..."
-                                value={transcriptSupport}
-                                onChange={e => setTranscriptSupport(e.target.value)}
-                            />
+                            <div className="relative">
+                                <textarea
+                                    rows={8}
+                                    className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none font-mono text-sm"
+                                    placeholder="Paste transcript here... or record audio"
+                                    value={transcriptSupport}
+                                    onChange={e => setTranscriptSupport(e.target.value)}
+                                />
+                                <div className="absolute right-2 bottom-2">
+                                    <AudioRecorder onTranscriptionComplete={(text) => setTranscriptSupport(prev => (prev || '') + ' ' + text)} />
+                                </div>
+                            </div>
 
                             <div className="flex gap-4 mt-6">
                                 <button
