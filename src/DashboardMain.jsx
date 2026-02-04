@@ -647,9 +647,14 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
         });
 
         try {
+            console.log("🤖 Generating Execution Plan...");
             const raw = await generateWithContext(prompt, profile);
+            console.log("📝 Raw AI Response:", raw);
+
             const list = cleanAndParseJson(raw);
-            if (Array.isArray(list)) {
+            console.log("📊 Parsed List:", list);
+
+            if (Array.isArray(list) && list.length > 0) {
                 // Enrich with IDs
                 const newActions = list.map((item, idx) => ({
                     ...item,
@@ -663,6 +668,9 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
                     subStreams: newActions,
                     currentActionId: newActions[0].id
                 });
+            } else {
+                console.error("❌ Invalid format returned:", list);
+                alert("AI generated invalid format. Please try again. Check console for details.");
             }
         } catch (e) {
             console.error("AI Generation Error:", e);
