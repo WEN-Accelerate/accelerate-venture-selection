@@ -472,10 +472,14 @@ export default function DashboardMain() {
 
     return (
         <div className="min-h-screen bg-[#F4F6F8]">
-            {/* HEADER */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-30 px-8 py-4 flex justify-between items-center shadow-sm">
                 <div className="flex items-center gap-2">
-                    <div className="bg-[#D32F2F] text-white p-2 rounded-lg font-bold">A</div>
+                    <img
+                        src="https://wadhwanifoundation.org/wp-content/uploads/2023/10/Wadhwani-Foundation-Logo.png"
+                        alt="Wadhwani Foundation"
+                        className="h-10 w-auto object-contain"
+                    />
+                    <div className="h-6 w-[1px] bg-gray-300 mx-2"></div>
                     <h1 className="text-xl font-bold text-gray-900 tracking-tight">Accelerate<span className="text-[#D32F2F]">Dashboard</span></h1>
                     {/* CENTER: VIEW MODE TOGGLE */}
                     <div className="bg-gray-100 border border-gray-200 p-1 rounded-lg flex gap-1 ml-8">
@@ -661,8 +665,8 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
                 });
             }
         } catch (e) {
-            console.error(e);
-            alert("Failed to generate actions.");
+            console.error("AI Generation Error:", e);
+            alert(`Failed to generate actions. Error: ${e.message}`);
         }
         setIsGenerating(false);
     };
