@@ -1,11 +1,16 @@
+-- ⚠️ RESET SCRIPT: This will delete existing prompt data to ensure schema matches.
+-- Run this in Supabase SQL Editor to fix "column does not exist" errors.
+
+drop table if exists public.ai_prompts;
+
 -- Create table for managing AI Prompts
-create table if not exists public.ai_prompts (
+create table public.ai_prompts (
   id uuid default gen_random_uuid() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   
   -- Unique identifier for the prompt (e.g., 'company_research', 'generate_one_pager')
-  slug text not null unique,
+  slug text not null,
   
   -- The prompt template with variable placeholders like {{variable}}
   template text not null,
@@ -17,7 +22,9 @@ create table if not exists public.ai_prompts (
   model_config jsonb default '{}'::jsonb,
   
   -- Is this prompt active?
-  is_active boolean default true
+  is_active boolean default true,
+
+  constraint ai_prompts_slug_key unique (slug)
 );
 
 -- Policy to allow public read access (for the app to fetch prompts)

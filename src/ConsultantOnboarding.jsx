@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import netlifyIdentity from 'netlify-identity-widget';
 import { MapPin, Briefcase, Globe, Linkedin, Save, Loader2, Sparkles, LogOut } from 'lucide-react';
 import { reliableGenerateContent, cleanAndParseJson } from './utils/aiService';
+import { getPromptQuery, hydratePrompt } from './utils/promptManager';
 
 // Config
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xyz.supabase.co';
@@ -78,11 +79,12 @@ export default function ConsultantOnboarding() {
                 : '';
 
             // OPTIMIZED PROMPT: Search for public information ABOUT the person
-            const prompt = `You are researching a business consultant. Search the web for publicly available information.
+            // OPTIMIZED PROMPT: Search for public information ABOUT the person
+            const { template } = await getPromptQuery('consultant_research_web', `You are researching a business consultant. Search the web for publicly available information.
 
 SEARCH STRATEGY:
-1. If LinkedIn URL provided: Search for "${linkedInName}" consultant professional profile
-2. If Website provided: Visit ${formData.website_url}
+1. If LinkedIn URL provided: Search for "{{linkedInName}}" consultant professional profile
+2. If Website provided: Visit {{website_url}}
 3. Look for: Articles, interviews, company websites, professional directories, press releases
 
 EXTRACT these details in JSON format:
@@ -97,10 +99,10 @@ EXTRACT these details in JSON format:
 }
 
 SEARCH SOURCES TO TRY:
-- "${formData.linkedin_url || formData.website_url}"
-- "${linkedInName} consultant profile"
-- "${linkedInName} professional biography"
-- "${formData.website_url}"
+- "{{linkedin_url}}"
+- "{{linkedInName}} consultant profile"
+- "{{linkedInName}} professional biography"
+- "{{website_url}}"
 
 CRITICAL RULES:
 - Search for PUBLIC information about this person (articles, bios, company pages)
@@ -109,7 +111,13 @@ CRITICAL RULES:
 - Focus on professional credentials and experience
 - Return ONLY valid JSON
 
-Return JSON only.`;
+Return JSON only.`);
+
+            const prompt = hydratePrompt(template, {
+                linkedInName,
+                website_url: formData.website_url,
+                linkedin_url: formData.linkedin_url
+            });
 
             // CRITICAL: Enable web search for discovery
             const rawText = await reliableGenerateContent(prompt, {
@@ -157,9 +165,9 @@ Return JSON only.`;
         try {
             console.log("📋 Extracting from pasted LinkedIn content...");
 
-            const prompt = `Extract consultant information from this LinkedIn profile text:
+            const { template } = await getPromptQuery('consultant_extract_paste', `Extract consultant information from this LinkedIn profile text:
 
-${linkedInText}
+{{linkedInText}}
 
 Parse and return ONLY valid JSON with these fields:
 {
@@ -172,7 +180,9 @@ Parse and return ONLY valid JSON with these fields:
     "other_comments": "Certifications, awards, skills mentioned"
 }
 
-Extract ONLY what is explicitly stated. Return valid JSON only.`;
+Extract ONLY what is explicitly stated. Return valid JSON only.`);
+
+            const prompt = hydratePrompt(template, { linkedInText });
 
             // NO web search needed - parsing provided text
             const rawText = await reliableGenerateContent(prompt);
@@ -224,7 +234,7 @@ Extract ONLY what is explicitly stated. Return valid JSON only.`;
                 try {
                     const base64 = e.target.result.split(',')[1];
 
-                    const prompt = `You are analyzing a consultant's resume/CV in PDF format.
+                    const { template } = await getPromptQuery('consultant_extract_pdf', `You are analyzing a consultant's resume/CV in PDF format.
 
 Extract and return ONLY valid JSON with these fields:
 {
@@ -240,7 +250,9 @@ Extract and return ONLY valid JSON with these fields:
 Focus on professional experience and consulting-relevant information.
 Return valid JSON only.
 
-Resume content: ${file.name}`;
+Resume content: {{fileName}}`);
+
+                    const prompt = hydratePrompt(template, { fileName: file.name });
 
                     // Note: For actual PDF text extraction, you'd need a PDF parsing library
                     // For now, we'll use a simplified approach

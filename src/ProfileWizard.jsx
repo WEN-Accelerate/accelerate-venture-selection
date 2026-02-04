@@ -28,7 +28,8 @@ const BRAND_COLORS = {
 };
 
 // --- AI HELPER ---
-import { reliableGenerateContent, cleanAndParseJson } from './utils/aiService';
+import { reliableGenerateContent, cleanAndParseJson, generateWithContext } from './utils/aiService';
+import { getPromptQuery, hydratePrompt } from './utils/promptManager';
 import { AudioRecorder } from './components/AudioRecorder';
 
 // --- RENDER HELPERS ---
@@ -94,8 +95,19 @@ export default function ProfileWizard() {
         keyPersonnel: "",
         strategyDescription: "",
         strategyDimensions: { product: "", proposition: "", place: "", promotion: "" },
-        supportDetails: {} // { "Product_MVP": "WF", "Product_Design": "Self" }
+        strategyDimensions: { product: "", proposition: "", place: "", promotion: "" },
+        supportDetails: {}, // Legacy
+        streams: {
+            "GTM": { goal: "", rag: "Green", suggestions: [] },
+            "Product": { goal: "", rag: "Green", suggestions: [] },
+            "Operations": { goal: "", rag: "Green", suggestions: [] },
+            "Supply Chain": { goal: "", rag: "Green", suggestions: [] },
+            "Talent": { goal: "", rag: "Green", suggestions: [] },
+            "Money": { goal: "", rag: "Green", suggestions: [] }
+        }
     });
+
+    const STREAMS = ["GTM", "Product", "Operations", "Supply Chain", "Talent", "Money"];
 
     const [hypotheticalExamples, setHypotheticalExamples] = useState({ domestic: "", international: "" });
     const [onePageSummary, setOnePageSummary] = useState("");
@@ -188,7 +200,8 @@ export default function ProfileWizard() {
 
         try {
             console.log("Attempting Deep Search via AI Service...");
-            const prompt = `Research the company "${profile.companyName}".
+            // NEW: Fetch prompt from Admin Panel
+            const { template } = await getPromptQuery('company_research', `Research the company "{{companyName}}".
             Return a JSON object with these exact keys:
             {
                 "name": "Legal Name",
@@ -202,9 +215,12 @@ export default function ProfileWizard() {
                 "marketPosition": "Current standing",
                 "employees": "Estimated count (e.g. 100-500)"
             }
-            If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`;
+            If specific data is not found, make a best guess or leave empty. Return ONLY JSON.`);
+
+            const prompt = hydratePrompt(template, { companyName: profile.companyName });
 
             // CRITICAL: Enable web search for accurate company research
+            // Context not needed for initial scrape (we are finding the context!)
             const rawText = await reliableGenerateContent(prompt, {
                 useSearch: true  // Enable web search grounding for factual data
             });
@@ -248,17 +264,18 @@ export default function ProfileWizard() {
     const generateHypotheticalExamples = async () => {
         if (hypotheticalExamples.domestic) return; // Already loaded
         setLoading(true);
-        const prompt = `
-            Context: Company ${profile.companyName}, Industry: ${profile.industry}, Product: ${profile.products}.
+        const { template } = await getPromptQuery('hypothetical_examples', `
+            Context: Company {{companyName}}, Industry: {{industry}}, Product: {{products}}.
             Generate 2 hypothetical expansion scenarios (2 sentences each):
             1. Domestic Expansion Scenario
             2. International Expansion Scenario
             
             CRITICAL: Return ONLY valid JSON. No explanations, no markdown, no additional text.
             Format: { "domestic": "string", "international": "string" }
-        `;
+        `);
+        const prompt = hydratePrompt(template, profile);
         try {
-            const raw = await reliableGenerateContent(prompt);
+            const raw = await generateWithContext(prompt, profile);
             const data = cleanAndParseJson(raw);
             setHypotheticalExamples({
                 domestic: data.domestic || "Expand to adjacent cities...",
@@ -344,8 +361,9 @@ export default function ProfileWizard() {
     };
 
     const handleSubItemLearnMore = async (category, subItem) => {
-        const prompt = `Explain what "${subItem}" involves in the context of "${category}" for a startup. Keep it to 1 sentence.`;
-        const res = await reliableGenerateContent(prompt);
+        const { template } = await getPromptQuery('explain_support_item', `Explain what "{{subItem}}" involves in the context of "{{category}}" for this company. Keep it to 1 sentence.`);
+        const prompt = hydratePrompt(template, { subItem, category });
+        const res = await generateWithContext(prompt, profile);
         alert(`${subItem} (${category}):\n\n${res}`);
     };
 
@@ -373,18 +391,23 @@ export default function ProfileWizard() {
 
     const generateOnePager = async () => {
         setOnePageLoading(true);
-        const prompt = `
-            Generate a "One Page Executive Summary" for ${profile.companyName}'s expansion strategy.
+        const { template } = await getPromptQuery('generate_one_pager', `
+            Generate a "One Page Executive Summary" for {{companyName}}'s expansion strategy.
             Data:
-            - Goal: Reach ${profile.growthTarget} in 4 years.
-            - Strategy: ${profile.ventureType} Expansion.
-            - Description: ${profile.strategyDescription}
-            - 4Ps: ${JSON.stringify(profile.strategyDimensions)}
-            - Help Needed: ${Object.entries(profile.supportDetails).filter(([k, v]) => v === 'WF').map(([k]) => k).join(', ')}
+            - Goal: Reach {{growthTarget}} in 4 years.
+            - Strategy: {{ventureType}} Expansion.
+            - Description: {{strategyDescription}}
+            - 4Ps: {{strategyDimensions}}
+            - Help Needed: {{supportDetails}}
 
             Format as a cohesive narrative (approx 200 words).
-        `;
-        const res = await reliableGenerateContent(prompt);
+        `);
+        const prompt = hydratePrompt(template, {
+            ...profile,
+            strategyDimensions: JSON.stringify(profile.strategyDimensions),
+            supportDetails: Object.entries(profile.supportDetails).filter(([k, v]) => v === 'WF').map(([k]) => k).join(', ')
+        });
+        const res = await generateWithContext(prompt, profile);
         setOnePageSummary(res);
         setOnePageLoading(false);
     };
@@ -396,20 +419,21 @@ export default function ProfileWizard() {
         setChatInput("");
 
         // Context-aware AI response
-        const prompt = `
+        const { template } = await getPromptQuery('wizard_chat_advice', `
             Act as a Senior Growth Consultant for:
-            Company: ${profile.companyName}
-            Industry: ${profile.industry}
-            Product: ${profile.products}
-            Employees: ${profile.employees}
-            Current Revenue: ${profile.revenue}
+            Company: {{companyName}}
+            Industry: {{industry}}
+            Product: {{products}}
+            Employees: {{employees}}
+            Current Revenue: {{revenue}}
             
-            Context: The user is defining their "${profile.ventureType}" expansion strategy.
-            User Question: "${userMsg}"
+            Context: The user is defining their "{{ventureType}}" expansion strategy.
+            User Question: "{{userMsg}}"
             
             Provide a short, specific, and high-impact piece of advice (max 2 sentences).
-        `;
-        const reply = await reliableGenerateContent(prompt);
+        `);
+        const prompt = hydratePrompt(template, { ...profile, userMsg });
+        const reply = await generateWithContext(prompt, profile);
         setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
     };
 
@@ -420,9 +444,9 @@ export default function ProfileWizard() {
 
         const typeToAnalyze = selectedType || profile.ventureType;
 
-        const prompt = `
-            Context: Company ${profile.companyName}, Industry: ${profile.industry}.
-            Goal: ${typeToAnalyze} Expansion.
+        const { template } = await getPromptQuery('learn_more_scenarios', `
+            Context: Company {{companyName}}, Industry: {{industry}}.
+            Goal: {{typeToAnalyze}} Expansion.
             
             Generate 6 distinct, hypothetical expansion scenarios (strategies) for this company.
             Each should be different (e.g. M&A, Organic, Partnership, Digital-First, etc.).
@@ -436,10 +460,11 @@ export default function ProfileWizard() {
                 }
             ]
             Return strictly JSON.
-        `;
+        `);
+        const prompt = hydratePrompt(template, { ...profile, typeToAnalyze });
 
         try {
-            const raw = await reliableGenerateContent(prompt);
+            const raw = await generateWithContext(prompt, profile);
             const parsed = cleanAndParseJson(raw);
             setLearnMoreData(Array.isArray(parsed) ? parsed : [parsed]);
         } catch (e) {
@@ -465,9 +490,9 @@ export default function ProfileWizard() {
 
     const handleSuggestDimensions = async () => {
         setLoading(true);
-        const prompt = `
-            Act as a Strategy Consultant for ${profile.companyName} (${profile.industry}).
-            Expansion Type: ${profile.ventureType}.
+        const { template } = await getPromptQuery('suggest_4ps', `
+            Act as a Strategy Consultant for {{companyName}} ({{industry}}).
+            Expansion Type: {{ventureType}}.
             
             Define the 4 Dimensions of their expansion strategy:
             1. Which Product/s? (What to sell)
@@ -476,9 +501,10 @@ export default function ProfileWizard() {
             4. What Promotion? (Marketing)
 
             Return JSON: { "product": "...", "proposition": "...", "place": "...", "promotion": "..." }
-        `;
+        `);
+        const prompt = hydratePrompt(template, profile);
         try {
-            const raw = await reliableGenerateContent(prompt);
+            const raw = await generateWithContext(prompt, profile);
             const data = cleanAndParseJson(raw);
             setProfile(prev => ({
                 ...prev,
@@ -504,22 +530,23 @@ export default function ProfileWizard() {
             return;
         }
         setIsProcessingTranscript(true);
-        const prompt = `
-            Act as a Strategy Consultant. Refine the expansion strategy for ${profile.companyName} based on this meeting transcript/notes.
+        const { template } = await getPromptQuery('refine_strategy_transcript', `
+            Act as a Strategy Consultant. Refine the expansion strategy for {{companyName}} based on this meeting transcript/notes.
             
-            transcript: "${transcriptStrategy}"
+            transcript: "{{transcriptStrategy}}"
             
-            Current Context: ${profile.ventureType} Expansion.
+            Current Context: {{ventureType}} Expansion.
             
             Task:
             1. Summarize the "How to expand" (Strategy Description) in 2 sentences.
             2. Extract the 4Ps: Product, Proposition, Place (Channel), Promotion.
             
             Return JSON: { "description": "...", "product": "...", "proposition": "...", "place": "...", "promotion": "..." }
-        `;
+        `);
+        const prompt = hydratePrompt(template, { ...profile, transcriptStrategy });
 
         try {
-            const raw = await reliableGenerateContent(prompt);
+            const raw = await generateWithContext(prompt, profile);
             const data = cleanAndParseJson(raw);
 
             setProfile(prev => ({
@@ -541,6 +568,66 @@ export default function ProfileWizard() {
         setIsProcessingTranscript(false);
     };
 
+    // --- STREAM AI HANDLERS ---
+    const handleStreamSuggestion = async (streamName) => {
+        setLoading(true);
+        const { template } = await getPromptQuery('suggest_stream_goals', `Act as a Senior Strategy Consultant.
+    
+    Context:
+    Venture Description: "{{strategyDescription}}"
+    Industry: "{{industry}}"
+    Growth Target: "{{growthTarget}}"
+    
+    Task:
+    For the operational stream "{{streamName}}", propose 5 distinct, specific, measurable, and outcome-focused End Goals.
+    These should not be mere activities, but clear milestones/states of success (e.g., "Achieve $1M ARR via direct sales" instead of "Hire sales team").
+    
+    Return a JSON object with a single key "goals" containing an array of 5 strings.
+    Example: { "goals": ["Goal 1...", "Goal 2...", ...] }
+    Return ONLY valid JSON.`);
+
+        const prompt = hydratePrompt(template, {
+            streamName,
+            strategyDescription: profile.strategyDescription,
+            industry: profile.industry,
+            growthTarget: profile.growthTarget
+        });
+
+        try {
+            const raw = await generateWithContext(prompt, profile);
+            const data = cleanAndParseJson(raw);
+            if (data && data.goals) {
+                setProfile(prev => ({
+                    ...prev,
+                    streams: {
+                        ...prev.streams,
+                        [streamName]: {
+                            ...prev.streams[streamName],
+                            suggestions: data.goals
+                        }
+                    }
+                }));
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to generate suggestions. Please try again.");
+        }
+        setLoading(false);
+    };
+
+    const handleStreamUpdate = (streamName, field, value) => {
+        setProfile(prev => ({
+            ...prev,
+            streams: {
+                ...prev.streams,
+                [streamName]: {
+                    ...prev.streams[streamName],
+                    [field]: value
+                }
+            }
+        }));
+    };
+
     const handleAutoFillSupportFromTranscript = async () => {
         if (!transcriptSupport.trim()) {
             setSupportStep(0);
@@ -548,10 +635,10 @@ export default function ProfileWizard() {
             return;
         }
         setIsProcessingTranscript(true);
-        const prompt = `
+        const { template } = await getPromptQuery('analyze_support_transcript', `
             Act as a Growth Diagnostics AI. Analyze this transcript to identify where the company needs EXTERNAL HELP (Wadhwani Foundation Support).
             
-            Transcript: "${transcriptSupport}"
+            Transcript: "{{transcriptSupport}}"
             
             Support Categories:
             - Product (Market Fit, Feature Roadmap, Tech Stack, UI/UX, QA)
@@ -566,10 +653,11 @@ export default function ProfileWizard() {
             Return JSON object where keys are "Category_SubItem" (e.g. "Product_Market Fit") and value is "WF" (for Wadhwani Foundation support) or "Self" (if they are doing it in-house).
             Only include mentioned items.
             Example: { "Product_Market Fit": "WF", "Structure_Hiring": "Self" }
-        `;
+        `);
+        const prompt = hydratePrompt(template, { ...profile, transcriptSupport });
 
         try {
-            const raw = await reliableGenerateContent(prompt);
+            const raw = await generateWithContext(prompt, profile);
             const data = cleanAndParseJson(raw);
 
             setProfile(prev => ({
@@ -1420,80 +1508,91 @@ export default function ProfileWizard() {
                     </StepContainer>
                 )}
 
-                {/* STEP 10: HELP NEEDED (Was 8) */}
+                {/* STEP 10: STREAM STRATEGY (Replaces Support Grid) */}
                 {step === 10 && (
-                    <StepContainer title={`Support Assessment (${supportStep + 1}/2)`} onBack={handleSupportBack} aiContext={aiContext}>
-                        <p className="text-gray-500 mb-6 text-sm">Select your execution model for each critical sub-area.</p>
-
+                    <StepContainer title="Operational Strategy" onBack={handleBack} aiContext={aiContext}>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {Object.entries(SUPPORT_SUB_DOMAINS)
-                                .slice(supportStep * 3, supportStep * 3 + 3)
-                                .map(([category, subItems]) => (
-                                    <div key={category} className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-all">
-                                        {/* Card Header */}
-                                        <div className="flex justify-between items-start mb-6">
-                                            <h3 className="text-xl font-black text-gray-900 tracking-tight">{category} Support</h3>
-                                            <div className="p-2 bg-red-50 text-red-600 rounded-xl">
-                                                {category.includes('Products') && <Target size={18} />}
-                                                {category.includes('Money') && <DollarSign size={18} />}
-                                                {category.includes('Customers') && <Globe size={18} />}
-                                                {category.includes('Team') && <Users size={18} />}
-                                                {category.includes('Operations') && <Building2 size={18} />}
-                                            </div>
+                            {STREAMS.map(stream => {
+                                const sData = profile.streams[stream] || { goal: "", rag: "Green", suggestions: [] };
+                                return (
+                                    <div key={stream} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                                        <div className={`absolute top-0 left-0 w-1 h-full ${sData.rag === 'Red' ? 'bg-red-500' : sData.rag === 'Amber' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
+
+                                        <div className="flex justify-between items-center mb-3 pl-3">
+                                            <h3 className="font-bold text-gray-800">{stream}</h3>
+                                            <select
+                                                value={sData.rag}
+                                                onChange={(e) => handleStreamUpdate(stream, 'rag', e.target.value)}
+                                                className={`text-xs font-bold px-2 py-1 rounded border-none focus:ring-1 cursor-pointer outline-none ${sData.rag === 'Red' ? 'bg-red-100 text-red-700' :
+                                                        sData.rag === 'Amber' ? 'bg-amber-100 text-amber-700' :
+                                                            'bg-emerald-100 text-emerald-700'
+                                                    }`}
+                                            >
+                                                <option value="Green">On Track</option>
+                                                <option value="Amber">Attention</option>
+                                                <option value="Red">Critical</option>
+                                            </select>
                                         </div>
 
-                                        {/* Sub Items List */}
-                                        <div className="space-y-6 flex-1">
-                                            {subItems.map(item => {
-                                                const val = profile.supportDetails?.[`${category}_${item}`] || 'NA';
-                                                return (
-                                                    <div key={item} className="space-y-1.5">
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="font-bold text-gray-700 text-xs">{item}</span>
-                                                            <button
-                                                                onClick={() => handleSubItemLearnMore(category, item)}
-                                                                className="text-[9px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-0.5 hover:underline"
-                                                            >
-                                                                AI HELP
-                                                            </button>
-                                                        </div>
+                                        <div className="pl-3 space-y-3">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">End Goal</label>
+                                                <textarea
+                                                    placeholder={`Define specific goal for ${stream}...`}
+                                                    className="w-full text-sm p-2 border border-gray-200 rounded bg-gray-50 focus:bg-white focus:border-indigo-500 outline-none resize-none h-20"
+                                                    value={sData.goal}
+                                                    onChange={(e) => handleStreamUpdate(stream, 'goal', e.target.value)}
+                                                />
+                                            </div>
 
-                                                        <div className="flex bg-gray-50 p-1 rounded-lg gap-1">
-                                                            {['WF', 'Self', 'NA'].map(opt => {
-                                                                const isSelected = val === opt;
-                                                                return (
-                                                                    <button
-                                                                        key={opt}
-                                                                        onClick={() => handleSupportDetailChange(category, item, opt)}
-                                                                        className={`
-                                                                            flex-1 py-1.5 rounded-md text-[10px] font-bold transition-all duration-200
-                                                                            ${isSelected
-                                                                                ? 'bg-[#D32F2F] text-white shadow-sm'
-                                                                                : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                                                                            }
-                                                                        `}
-                                                                    >
-                                                                        {opt === 'WF' ? 'WF' : opt}
-                                                                    </button>
-                                                                );
-                                                            })}
-                                                        </div>
+                                            {sData.suggestions && sData.suggestions.length > 0 ? (
+                                                <div className="bg-indigo-50 p-2 rounded border border-indigo-100">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <span className="text-[10px] font-bold text-indigo-600 uppercase">AI Suggestions</span>
+                                                        <button
+                                                            onClick={() => handleStreamUpdate(stream, 'suggestions', [])}
+                                                            className="text-gray-400 hover:text-gray-600"
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
                                                     </div>
-                                                );
-                                            })}
+                                                    <div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar">
+                                                        {sData.suggestions.map((sug, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    handleStreamUpdate(stream, 'goal', sug);
+                                                                    handleStreamUpdate(stream, 'suggestions', []);
+                                                                }}
+                                                                className="text-left text-xs p-1.5 w-full hover:bg-white rounded transition-colors text-indigo-900 border border-transparent hover:border-indigo-200"
+                                                            >
+                                                                {sug}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleStreamSuggestion(stream)}
+                                                    disabled={loading}
+                                                    className="w-full py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 flex items-center justify-center gap-2 transition-colors"
+                                                >
+                                                    {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                                    Suggest Goals
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
-                                ))}
+                                );
+                            })}
                         </div>
 
-                        <div className="flex gap-4 mt-8">
-                            <div className="flex-1 flex justify-center gap-2 py-4">
-                                {[0, 1].map(i => (
-                                    <div key={i} className={`w-2 h-2 rounded-full transition-all ${supportStep === i ? 'bg-red-600 w-6' : 'bg-gray-200'}`}></div>
-                                ))}
-                            </div>
-                            <button onClick={handleSupportNext} className="w-40 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100">
-                                {supportStep === 1 ? 'Finish' : 'Next'}
+                        <div className="flex justify-end mt-8">
+                            <button
+                                onClick={() => setStep(11)}
+                                className="px-8 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-100 flex items-center gap-2"
+                            >
+                                Next Step <ArrowRight size={18} />
                             </button>
                         </div>
                     </StepContainer>
@@ -1544,7 +1643,7 @@ export default function ProfileWizard() {
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase">Focus Areas</label>
                                         <div className="font-bold text-red-600">
-                                            {Object.values(profile.supportDetails).filter(v => v === 'WF').length} / 5
+                                            {Object.values(profile.streams).filter(s => s.rag === 'Red').length} Critical
                                         </div>
                                     </div>
                                 </div>
@@ -1572,69 +1671,20 @@ export default function ProfileWizard() {
                                 )}
                             </div>
 
-                            {/* 3. SUPPORT DASHBOARD */}
+                            {/* 3. STREAM SUMMARY */}
                             <div>
-                                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Execution Support Plan</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    {/* Focus Areas */}
-                                    <div className="md:col-span-2 bg-gradient-to-br from-white to-red-50/50 border border-red-100 rounded-2xl p-6 shadow-sm">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="bg-red-600 text-white p-1.5 rounded-lg">
-                                                    <Target size={16} />
-                                                </div>
-                                                <span className="font-bold text-gray-900">Wadhwani Focus Areas</span>
+                                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Execution Strategy Map</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {Object.entries(profile.streams).map(([name, data]) => (
+                                        <div key={name} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm flex items-start justify-between relative overflow-hidden">
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${data.rag === 'Red' ? 'bg-red-500' : data.rag === 'Amber' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
+                                            <div className="pl-3">
+                                                <h4 className="font-bold text-gray-900 text-sm">{name}</h4>
+                                                <p className="text-xs text-gray-600 mt-1 line-clamp-2" title={data.goal}>{data.goal || 'No goal set'}</p>
                                             </div>
-                                            <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                                                {Object.values(profile.supportDetails).filter(v => v === 'WF').length} Selected
-                                            </span>
+                                            <div className={`w-2 h-2 rounded-full ${data.rag === 'Red' ? 'bg-red-500' : data.rag === 'Amber' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {Object.entries(profile.supportDetails).filter(([_, v]) => v === 'WF').map(([key]) => {
-                                                const [cat, item] = key.split('_');
-                                                return (
-                                                    <div key={key} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                                                        <CheckCircle size={16} className="text-red-500 shrink-0" />
-                                                        <div>
-                                                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{cat}</div>
-                                                            <div className="text-sm font-bold text-gray-800">{item}</div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                            {Object.values(profile.supportDetails).filter(v => v === 'WF').length === 0 && (
-                                                <div className="col-span-full py-4 text-center text-gray-400 italic text-sm">None selected</div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* In-House & NA */}
-                                    <div className="space-y-4">
-                                        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className="font-bold text-gray-700 text-sm flex items-center gap-2">
-                                                    <Users size={14} className="text-gray-400" /> In-House
-                                                </span>
-                                                <span className="text-xs font-bold text-gray-500">{Object.values(profile.supportDetails).filter(v => v === 'Self').length}</span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {Object.entries(profile.supportDetails).filter(([_, v]) => v === 'Self').map(([key]) => (
-                                                    <span key={key} className="text-[10px] font-semibold bg-gray-50 border border-gray-100 px-2 py-1 rounded text-gray-600">
-                                                        {key.split('_')[1]}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-5 opacity-75">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <span className="font-bold text-gray-500 text-sm flex items-center gap-2">
-                                                    <Info size={14} /> Not Applicable
-                                                </span>
-                                                <span className="text-xs font-bold text-gray-400">{Object.values(profile.supportDetails).filter(v => v === 'NA').length}</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
 

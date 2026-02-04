@@ -275,3 +275,37 @@ export const cleanAndParseJson = (text) => {
         return {};
     }
 };
+
+/**
+ * Generates content with mandatory Company Context injection.
+ * 
+ * @param {string} prompt - The specific prompt for the task
+ * @param {object} profile - The company profile object (must contain companyName, industry, etc.)
+ * @param {object} options - Generation options (useSearch, etc.)
+ */
+export const generateWithContext = async (prompt, profile, options = {}) => {
+    if (!profile) {
+        console.warn("⚠️ generateWithContext called without profile! Falling back to raw prompt.");
+        return reliableGenerateContent(prompt, options);
+    }
+
+    const contextBlock = `
+--- GLOBAL COMPANY CONTEXT ---
+Company: ${profile.companyName || 'Unspecified'}
+Industry: ${profile.industry || 'Unspecified'}
+Product/Service: ${profile.products || 'Unspecified'}
+Target Customer: ${profile.customers || 'Unspecified'}
+Employees: ${profile.employees || 'Unknown'}
+Location: ${profile.location || 'Unknown'}
+Current Revenue: ${profile.revenue || 'Unknown'}
+Venture Type: ${profile.ventureType} Expansion
+Strategy Description: "${profile.strategyDescription || 'N/A'}"
+--- END CONTEXT ---
+
+Task:
+${prompt}
+    `;
+
+    console.log("🧬 AI Service: Injecting Company Context...");
+    return reliableGenerateContent(contextBlock, options);
+};

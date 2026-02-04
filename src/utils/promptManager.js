@@ -15,7 +15,7 @@ let promptCache = {};
  */
 export const getPromptQuery = async (slug, defaultTemplate) => {
     // 1. Cache Check
-    if (promptCache[slug]) return promptCache[slug];
+    if (promptCache[slug]) return { template: promptCache[slug] };
 
     try {
         // 2. DB Fetch
@@ -27,16 +27,18 @@ export const getPromptQuery = async (slug, defaultTemplate) => {
 
         if (error || !data || !data.is_active) {
             console.warn(`⚠️ AI Prompt: DB fetch failed/missing for '${slug}'. Using hardcoded default.`);
-            return defaultTemplate;
+            // Auto-insert default into cache so we don't spam DB on failure
+            promptCache[slug] = defaultTemplate;
+            return { template: defaultTemplate };
         }
 
         // Update Cache
         promptCache[slug] = data.template;
-        return data.template;
+        return { template: data.template };
 
     } catch (e) {
         console.error("AI Prompt System Error:", e);
-        return defaultTemplate;
+        return { template: defaultTemplate };
     }
 };
 
