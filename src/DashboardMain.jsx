@@ -613,7 +613,29 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
             return;
         }
         setIsGenerating(true);
-        const { template } = await getPromptQuery('generate_substreams', `Act as an Execution Expert...`);
+        const { template } = await getPromptQuery('generate_substreams', `
+            Act as an Execution Expert and Project Manager.
+            
+            Context:
+            Stream: "{{streamName}}"
+            Selected End Goal: "{{endGoal}}"
+            Venture Context: {{strategyDescription}}
+            
+            Task:
+            Generate 5 SMART sub-streams (actions/checkpoints) to achieve this End Goal.
+            Spread them out over a timeline (approx 30, 90, 120, 150, 180 days).
+            
+            Return a JSON array of objects with this exact schema:
+            [
+                {
+                    "title": "Short Action Title",
+                    "description": "Specific action description",
+                    "deliverable": "Tangible output/artifact",
+                    "days_due": 30
+                }
+            ]
+            Return ONLY valid JSON.
+        `);
         const prompt = hydratePrompt(template, {
             streamName,
             endGoal: streamData.goal,
@@ -653,7 +675,32 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
     const handlePlaybook = async () => {
         if (!currentAction) return;
         setPlaybookLoading(true);
-        const { template } = await getPromptQuery('generate_stream_playbook', `Generate Playbook...`);
+        const { template } = await getPromptQuery('generate_stream_playbook', `
+            Act as a Business Process Expert.
+            
+            Context:
+            Stream: "{{streamName}}"
+            Action: "{{actionTitle}}"
+            Goal: "{{endGoal}}"
+            
+            Task:
+            Create a comprehensive, interactive "Playbook" for executing this specific action.
+            Output MUST be valid HTML code using Tailwind CSS for styling.
+            
+            Structure:
+            1. Title & Executive Summary
+            2. Step-by-Step SOP (Standard Operating Procedure)
+            3. Required Resources & Tools
+            4. Key Performance Indicators (KPIs)
+            5. Common Risks & Mitigation
+            
+            Design:
+            - Use a clean, professional, "Enterprise SaaS" aesthetic (Inter font, slate/blue colors).
+            - Use cards, lists, and clear typography.
+            - Do NOT include <html> or <body> tags, just the inner content container.
+            
+            Return ONLY the HTML string.
+        `);
         const prompt = hydratePrompt(template, {
             streamName,
             actionTitle: currentAction.title,
@@ -694,8 +741,9 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
                 </div>
                 <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase">End Goal</label>
-                    <input
-                        className="w-full bg-transparent font-medium text-gray-900 border-b border-dashed border-gray-300 focus:border-indigo-500 outline-none py-1 text-sm"
+                    <textarea
+                        className="w-full bg-transparent font-medium text-gray-900 border-b border-dashed border-gray-300 focus:border-indigo-500 outline-none py-1 text-sm resize-none"
+                        rows={2}
                         value={streamData.goal}
                         onChange={(e) => onUpdate(streamName, { goal: e.target.value })}
                         placeholder="Define end goal..."
