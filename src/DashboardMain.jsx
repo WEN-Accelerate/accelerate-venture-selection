@@ -477,6 +477,29 @@ export default function DashboardMain() {
                 <div className="flex items-center gap-2">
                     <div className="bg-[#D32F2F] text-white p-2 rounded-lg font-bold">A</div>
                     <h1 className="text-xl font-bold text-gray-900 tracking-tight">Accelerate<span className="text-[#D32F2F]">Dashboard</span></h1>
+                    {/* CENTER: VIEW MODE TOGGLE */}
+                    <div className="bg-gray-100 border border-gray-200 p-1 rounded-lg flex gap-1 ml-8">
+                        <button
+                            onClick={() => setViewMode('context')}
+                            className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'context'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-900'
+                                }`}
+                        >
+                            <Sparkles size={12} className={viewMode === 'context' ? 'text-yellow-500' : ''} />
+                            Blueprint
+                        </button>
+                        <button
+                            onClick={() => setViewMode('sprint')}
+                            className={`px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center gap-2 ${viewMode === 'sprint'
+                                ? 'bg-white text-[#D32F2F] shadow-sm'
+                                : 'text-gray-500 hover:text-gray-900'
+                                }`}
+                        >
+                            <Target size={12} />
+                            Sprint
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -506,16 +529,64 @@ export default function DashboardMain() {
             </header>
 
             <main className="max-w-[1600px] mx-auto px-6 py-8">
-                <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Execution Strategy Map</h2>
-                    <p className="text-gray-500">Track implementation across 6 critical streams.</p>
-                </div>
+                {viewMode === 'context' ? (
+                    // === BLUEPRINT VIEW ===
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto">
+                        {/* 1. HEADER CARD */}
+                        <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 relative overflow-hidden flex items-start justify-between">
+                            <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Sparkles className="text-yellow-500 w-4 h-4" />
+                                    <span className="text-[10px] font-bold tracking-[0.2em] text-gray-400 uppercase">Strategic Blueprint</span>
+                                </div>
+                                <h2 className="text-3xl font-bold text-gray-900 mb-2">{profile.companyName}</h2>
+                                <p className="text-gray-500 text-sm">Review your expansion roadmap before proceeding.</p>
+                            </div>
+                            {profile.logo && (
+                                <img src={profile.logo} alt="Company Logo" className="h-16 w-auto object-contain" />
+                            )}
+                        </div>
 
-                <StreamExecutionView
-                    profile={profile}
-                    onUpdateProfile={handleUpdateStream}
-                    onGeneratePlaybook={handleGeneratePlaybook}
-                />
+                        {/* 2. STRATEGY SUMMARY */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4">Core Strategy</h3>
+                                <p className="text-gray-600 leading-relaxed italic border-l-4 border-red-500 pl-4 bg-gray-50 py-4 pr-4 rounded-r-lg">
+                                    "{profile.strategyDescription || 'No summary provided.'}"
+                                </p>
+                            </div>
+                            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4">Expansion Goals</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Target Revenue (4Y)</div>
+                                        <div className="text-2xl font-black text-gray-900">₹ {profile.growthTarget} Cr</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-bold text-gray-400 uppercase">Venture Type</div>
+                                        <div className="text-lg font-bold text-indigo-600">{profile.ventureType}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    // === SPRINT VIEW ===
+                    <>
+                        <div className="mb-8 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Sprint Execution</h2>
+                                <p className="text-gray-500">Track implementation across 6 critical streams.</p>
+                            </div>
+                        </div>
+
+                        <StreamExecutionView
+                            profile={profile}
+                            onUpdateProfile={handleUpdateStream}
+                            onGeneratePlaybook={handleGeneratePlaybook}
+                        />
+                    </>
+                )}
             </main>
         </div>
     );
@@ -526,6 +597,7 @@ export default function DashboardMain() {
 const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [playbookLoading, setPlaybookLoading] = useState(false);
+    const [showExperts, setShowExperts] = useState(false); // Modal state for experts
 
     // Ensure data structure exists
     const streamData = data || { goal: "", rag: "Green", suggestions: [], subStreams: [] };
@@ -647,21 +719,41 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
                 ) : (
                     <>
                         {/* Current Action Selector */}
-                        <div>
-                            <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Current Action</label>
-                            <select
-                                className="w-full text-sm font-bold text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-lg p-2 outline-none"
-                                value={currentActionId || ''}
-                                onChange={(e) => onUpdate(streamName, { currentActionId: Number(e.target.value) })}
+                        <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Select Next Action</label>
+                                <select
+                                    className="w-full text-sm font-bold text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-lg p-2 outline-none cursor-pointer hover:bg-indigo-100 transition-colors"
+                                    value={currentActionId || ''}
+                                    onChange={(e) => onUpdate(streamName, { currentActionId: Number(e.target.value) })}
+                                >
+                                    {actions.map(a => (
+                                        <option key={a.id} value={a.id}>{a.title} ({a.status})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    const newAction = {
+                                        id: Date.now(),
+                                        title: "New Action Item",
+                                        status: 'Not Started',
+                                        owner: '',
+                                        dueDate: ''
+                                    };
+                                    onUpdate(streamName, {
+                                        subStreams: [...actions, newAction],
+                                        currentActionId: newAction.id
+                                    });
+                                }}
+                                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
+                                title="Add Manual Action"
                             >
-                                {actions.map(a => (
-                                    <option key={a.id} value={a.id}>{a.title} ({a.status})</option>
-                                ))}
-                            </select>
+                                <Plus size={18} />
+                            </button>
                         </div>
-
                         {/* Owner & Date */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3 pt-2">
                             <div>
                                 <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Assign Owner</label>
                                 <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded p-1.5 code">
@@ -696,14 +788,14 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
                 <div className="bg-gray-50 p-4 border-t border-gray-100 space-y-3">
                     <div>
                         <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Action Status</label>
-                        <div className="flex bg-white rounded border border-gray-200 p-1">
-                            {['Not Started', 'In Progress', 'Done'].map(st => (
+                        <div className="flex bg-white rounded border border-gray-200 p-1 shadow-sm">
+                            {['Done', 'In Progress', 'Delayed'].map(st => (
                                 <button
                                     key={st}
                                     onClick={() => updateAction(currentActionId, 'status', st)}
-                                    className={`flex-1 text-[10px] font-bold py-1 rounded transition-colors ${currentAction.status === st
-                                            ? (st === 'Done' ? 'bg-green-500 text-white' : st === 'In Progress' ? 'bg-amber-500 text-white' : 'bg-gray-500 text-white')
-                                            : 'text-gray-400 hover:bg-gray-50'
+                                    className={`flex-1 text-[10px] font-bold py-1.5 rounded transition-all ${currentAction.status === st
+                                        ? (st === 'Done' ? 'bg-emerald-500 text-white shadow-md' : st === 'In Progress' ? 'bg-blue-500 text-white shadow-md' : 'bg-red-500 text-white shadow-md')
+                                        : 'text-gray-400 hover:bg-gray-50'
                                         }`}
                                 >
                                     {st}
@@ -722,11 +814,40 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
                             Playbook
                         </button>
                         <button
-                            onClick={() => alert("Experts list would open here (Mockup)")}
+                            onClick={() => setShowExperts(true)}
                             className="py-2 bg-white border border-purple-200 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-50 transition-colors flex items-center justify-center gap-1"
                         >
                             <Users size={12} /> Experts
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPERTS MODAL */}
+            {showExperts && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
+                        <div className="bg-purple-600 p-4 text-white flex justify-between items-center">
+                            <h3 className="font-bold">Recommended Experts</h3>
+                            <button onClick={() => setShowExperts(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={16} /></button>
+                        </div>
+                        <div className="p-4 space-y-3 max-h-[300px] overflow-y-auto">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
+                                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500">E{i}</div>
+                                    <div className="flex-1">
+                                        <div className="font-bold text-sm text-gray-900 group-hover:text-purple-600">Expert Name {i}</div>
+                                        <div className="text-xs text-gray-500">Specialist in {streamName}</div>
+                                    </div>
+                                    <button className="p-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100">
+                                        <MessageCircle size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-4 bg-gray-50 text-center border-t border-gray-100">
+                            <p className="text-xs text-gray-400">Select an expert to request a session.</p>
+                        </div>
                     </div>
                 </div>
             )}
