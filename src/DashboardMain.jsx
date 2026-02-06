@@ -25,6 +25,7 @@ export default function DashboardMain() {
     const [filter, setFilter] = useState('ALL'); // ALL, WF, SELF, NA
     const [viewMode, setViewMode] = useState('context'); // 'context' or 'sprint'
     const [selectedCard, setSelectedCard] = useState(null); // For Modal
+    const [activeStreamPanel, setActiveStreamPanel] = useState(null); // For Side Panel
     const [isConsultantView, setIsConsultantView] = useState(false); // New state for consultant back button
     const [consultantName, setConsultantName] = useState('');
 
@@ -588,7 +589,18 @@ export default function DashboardMain() {
                             profile={profile}
                             onUpdateProfile={handleUpdateStream}
                             onGeneratePlaybook={handleGeneratePlaybook}
+                            onOpenPanel={setActiveStreamPanel}
                         />
+
+                        {/* SIDE PANEL FOR GENERATION */}
+                        {activeStreamPanel && (
+                            <StreamSidePanel
+                                streamName={activeStreamPanel}
+                                profile={profile}
+                                onClose={() => setActiveStreamPanel(null)}
+                                onUpdateStream={handleUpdateStream}
+                            />
+                        )}
                     </>
                 )}
             </main>
@@ -598,135 +610,195 @@ export default function DashboardMain() {
 
 // --- SUB-COMPONENTS ---
 
-const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook }) => {
+// --- NEW COMPONENTS ---
+
+const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
     const [isGenerating, setIsGenerating] = useState(false);
-    const [playbookLoading, setPlaybookLoading] = useState(false);
-    const [showExperts, setShowExperts] = useState(false); // Modal state for experts
+    const [generatedActions, setGeneratedActions] = useState([]);
+    const [goal, setGoal] = useState(profile.streams?.[streamName]?.goal || '');
 
-    // Ensure data structure exists
-    const streamData = data || { goal: "", rag: "Green", suggestions: [], subStreams: [] };
-    const actions = streamData.subStreams || [];
-
-    // Derived state
-    const currentActionId = streamData.currentActionId; // Store ID of selected current action
-    const currentAction = actions.find(a => a.id === currentActionId) || actions[0] || null;
-
-    const handleGenerateSubStreams = async () => {
-        if (!streamData.goal) {
-            alert("Please set an End Goal first.");
+    const handleGenerate = async () => {
+        if (!goal) {
+            alert("Please define an End Goal first.");
             return;
         }
         setIsGenerating(true);
-        const { template } = await getPromptQuery('generate_substreams', `
-            Act as an Execution Expert and Project Manager.
-            
-            Context:
-            Stream: "{{streamName}}"
-            Selected End Goal: "{{endGoal}}"
-            Venture Context: {{strategyDescription}}
-            
-            Task:
-            Generate 5 SMART sub-streams (actions/checkpoints) to achieve this End Goal.
-            Spread them out over a timeline (approx 30, 90, 120, 150, 180 days).
-            
-            Return a JSON array of objects with this exact schema:
-            [
-                {
-                    "title": "Short Action Title",
-                    "description": "Specific action description",
-                    "deliverable": "Tangible output/artifact",
-                    "days_due": 30
-                }
-            ]
-            Return ONLY valid JSON.
-        `);
-        const prompt = hydratePrompt(template, {
-            streamName,
-            endGoal: streamData.goal,
-            strategyDescription: profile.strategyDescription || ''
-        });
+        setGeneratedActions([]);
 
         try {
-            console.log("🤖 Generating Execution Plan...");
+            const { template } = await getPromptQuery('generate_substreams', `
+                Act as an Execution Expert.
+                Stream: "{{streamName}}"
+                Goal: "{{endGoal}}"
+                Context: {{strategyDescription}}
+                
+                Generate 5 specific, actionable sub-streams/milestones to achieve this goal.
+                Return ONLY a valid JSON array of objects:
+                [
+                    {
+                        "title": "Action Title",
+                        "description": "Brief description",
+                        "deliverable": "Key outcome/artifact",
+                        "days_due": 30
+                    }
+                ]
+            `);
+
+            const prompt = hydratePrompt(template, {
+                streamName,
+                endGoal: goal,
+                strategyDescription: profile.strategyDescription || ''
+            });
+
+            console.log("🤖 Generating Plan for:", streamName);
             const raw = await generateWithContext(prompt, profile);
-            console.log("📝 Raw AI Response:", raw);
-
             const list = cleanAndParseJson(raw);
-            console.log("📊 Parsed List:", list);
 
-            if (Array.isArray(list) && list.length > 0) {
-                // Enrich with IDs
-                const newActions = list.map((item, idx) => ({
+            if (Array.isArray(list)) {
+                setGeneratedActions(list.map((item, idx) => ({
                     ...item,
                     id: Date.now() + idx,
                     status: 'Not Started',
                     owner: '',
-                    dueDate: ''
-                }));
-
-                onUpdate(streamName, {
-                    subStreams: newActions,
-                    currentActionId: newActions[0].id
-                });
+                    dueDate: new Date(Date.now() + (item.days_due || 30) * 86400000).toISOString().split('T')[0]
+                })));
             } else {
-                console.error("❌ Invalid format returned:", list);
-                alert("AI generated invalid format. Please try again. Check console for details.");
+                throw new Error("Invalid format returned by AI");
             }
+
         } catch (e) {
-            console.error("AI Generation Error:", e);
-            alert(`Failed to generate actions. Error: ${e.message}`);
+            console.error("Generation Error:", e);
+            alert("Failed to generate plan. Please try again.");
         }
         setIsGenerating(false);
     };
 
+    const handleAddActions = () => {
+        const currentStream = profile.streams?.[streamName] || {};
+        const existingActions = currentStream.subStreams || [];
+
+        // Append new actions
+        const updatedActions = [...existingActions, ...generatedActions];
+
+        onUpdateStream(streamName, {
+            goal: goal, // Ensure goal is synced
+            subStreams: updatedActions,
+            currentActionId: generatedActions.length > 0 ? generatedActions[0].id : currentStream.currentActionId
+        });
+
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-y-0 right-0 w-[500px] bg-white shadow-2xl z-50 animate-slide-in-right overflow-y-auto border-l border-gray-200">
+            <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold text-gray-900">{streamName} Planning</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
+                        <X size={20} className="text-gray-500" />
+                    </button>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Goal Input */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">End Goal</label>
+                        <textarea
+                            value={goal}
+                            onChange={(e) => setGoal(e.target.value)}
+                            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                            rows={3}
+                            placeholder={`Define the success outcome for ${streamName}...`}
+                        />
+                    </div>
+
+                    {/* Generate Button */}
+                    <button
+                        onClick={handleGenerate}
+                        disabled={isGenerating || !goal}
+                        className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                        {isGenerating ? 'Generating Plan...' : 'Generate Action Plan'}
+                    </button>
+
+                    {/* Results */}
+                    {generatedActions.length > 0 && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                <CheckCircle size={16} className="text-emerald-500" />
+                                Proposed Actions ({generatedActions.length})
+                            </h3>
+                            <div className="space-y-3">
+                                {generatedActions.map((action, i) => (
+                                    <div key={i} className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                                        <div className="font-bold text-indigo-900 text-sm mb-1">{action.title}</div>
+                                        <div className="text-xs text-indigo-700 mb-2">{action.description}</div>
+                                        <div className="flex items-center gap-4 text-[10px] font-bold text-indigo-500 uppercase">
+                                            <span>Deliverable: {action.deliverable}</span>
+                                            <span>Due: {action.days_due} days</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button
+                                onClick={handleAddActions}
+                                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                            >
+                                Add Actions to Stream
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, onOpenPanel }) => {
+    const [showExperts, setShowExperts] = useState(false);
+
+    // Stream Data
+    const streamData = data || { goal: "", rag: "Green", subStreams: [] };
+    const actions = streamData.subStreams || [];
+    const currentActionId = streamData.currentActionId;
+    const currentAction = actions.find(a => a.id === currentActionId) || actions[0] || null;
+
+    // Handlers
+    const [playbookLoading, setPlaybookLoading] = useState(false);
+
+    // Handlers
     const updateAction = (actionId, field, value) => {
         const newActions = actions.map(a => a.id === actionId ? { ...a, [field]: value } : a);
         onUpdate(streamName, { subStreams: newActions });
     };
 
-    const handlePlaybook = async () => {
+    const handlePlaybookGen = async () => {
         if (!currentAction) return;
         setPlaybookLoading(true);
-        const { template } = await getPromptQuery('generate_stream_playbook', `
-            Act as a Business Process Expert.
-            
-            Context:
-            Stream: "{{streamName}}"
-            Action: "{{actionTitle}}"
-            Goal: "{{endGoal}}"
-            
-            Task:
-            Create a comprehensive, interactive "Playbook" for executing this specific action.
-            Output MUST be valid HTML code using Tailwind CSS for styling.
-            
-            Structure:
-            1. Title & Executive Summary
-            2. Step-by-Step SOP (Standard Operating Procedure)
-            3. Required Resources & Tools
-            4. Key Performance Indicators (KPIs)
-            5. Common Risks & Mitigation
-            
-            Design:
-            - Use a clean, professional, "Enterprise SaaS" aesthetic (Inter font, slate/blue colors).
-            - Use cards, lists, and clear typography.
-            - Do NOT include <html> or <body> tags, just the inner content container.
-            
-            Return ONLY the HTML string.
-        `);
-        const prompt = hydratePrompt(template, {
-            streamName,
-            actionTitle: currentAction.title,
-            endGoal: streamData.goal
-        });
-
-        // Mock opening playbook
         try {
+            const { template } = await getPromptQuery('generate_stream_playbook', `
+                Act as a Business Process Expert.
+                Stream: "{{streamName}}"
+                Action: "{{actionTitle}}"
+                Goal: "{{endGoal}}"
+                
+                Create a "Playbook" SOP (HTML).
+                Structure: Title, SOP Steps, Resources, KPIs.
+                Use Tailwind CSS. No html/body tags.
+            `);
+            const prompt = hydratePrompt(template, {
+                streamName,
+                actionTitle: currentAction.title,
+                endGoal: streamData.goal
+            });
+
+            console.log("Generating Playbook...");
             const html = await generateWithContext(prompt, profile);
-            // In a real app, we'd open this in a modal or new window. 
-            // For now, let's just save it to the action for display or log it.
-            console.log("Playbook Generated:", html);
             onGeneratePlaybook(currentAction.title, html);
         } catch (e) {
+            console.error(e);
             alert("Failed to generate playbook");
         }
         setPlaybookLoading(false);
@@ -734,179 +806,187 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
 
     return (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full hover:shadow-md transition-shadow">
-            {/* TOP: Header & Goal */}
-            <div className="bg-gray-50 border-b border-gray-100 p-4">
-                <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-bold text-gray-800 text-lg">{streamName}</h3>
-                    <div className="flex items-center gap-2">
+
+            {/* 1. TOP SECTION: Meta & Goal */}
+            <div className="bg-white p-5 border-b border-gray-100">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full ${streamData.rag === 'Red' ? 'bg-red-500' : streamData.rag === 'Amber' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
+                        <h3 className="font-bold text-gray-900 text-lg tracking-tight">{streamName}</h3>
+                    </div>
+
+                    {/* RAG & Timeline Controls */}
+                    <div className="flex flex-col items-end gap-1">
                         <select
                             value={streamData.rag || 'Green'}
                             onChange={(e) => onUpdate(streamName, { rag: e.target.value })}
-                            className="text-xs font-bold bg-white border border-gray-200 rounded px-2 py-1 outline-none"
+                            className="text-[10px] font-bold bg-gray-50 border border-gray-200 rounded px-2 py-1 outline-none text-gray-600 uppercase tracking-wide"
                         >
                             <option value="Green">On Track</option>
                             <option value="Amber">Issues</option>
                             <option value="Red">Critical</option>
                         </select>
+                        <input
+                            type="date"
+                            className="text-[10px] font-bold text-gray-400 bg-transparent text-right outline-none"
+                            value={streamData.targetDate || ''}
+                            onChange={(e) => onUpdate(streamName, { targetDate: e.target.value })}
+                        />
                     </div>
                 </div>
-                <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase">End Goal</label>
+
+                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1">End Goal</label>
                     <textarea
-                        className="w-full bg-transparent font-medium text-gray-900 border-b border-dashed border-gray-300 focus:border-indigo-500 outline-none py-1 text-sm resize-none"
+                        className="w-full bg-transparent font-medium text-gray-800 text-sm outline-none resize-none leading-relaxed placeholder-gray-400"
                         rows={2}
                         value={streamData.goal}
                         onChange={(e) => onUpdate(streamName, { goal: e.target.value })}
-                        placeholder="Define end goal..."
+                        placeholder={`What is the ultimate goal for ${streamName}?`}
                     />
                 </div>
             </div>
 
-            {/* MIDDLE: ACTION PLANNING */}
-            <div className="p-4 flex-1 space-y-4">
+            {/* 2. MIDDLE SECTION: Current Action */}
+            <div className="p-5 flex-1 flex flex-col justify-center">
                 {actions.length === 0 ? (
-                    <div className="text-center py-8">
+                    <div className="text-center">
+                        <p className="text-xs text-gray-400 mb-3">No actions defined yet.</p>
                         <button
-                            onClick={handleGenerateSubStreams}
-                            disabled={isGenerating}
-                            className="px-4 py-2 bg-indigo-50 text-indigo-700 font-bold rounded-lg text-sm hover:bg-indigo-100 transition-colors flex items-center gap-2 mx-auto"
+                            onClick={() => onOpenPanel(streamName)}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors"
                         >
-                            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                            Generate Execution Plan
+                            <Plus size={14} /> Add First Action
                         </button>
                     </div>
                 ) : (
-                    <>
-                        {/* Current Action Selector */}
-                        <div className="flex items-end gap-2">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
                             <div className="flex-1">
-                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Select Next Action</label>
+                                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Current Action</label>
                                 <select
-                                    className="w-full text-sm font-bold text-indigo-900 bg-indigo-50 border border-indigo-100 rounded-lg p-2 outline-none cursor-pointer hover:bg-indigo-100 transition-colors"
+                                    className="w-full text-sm font-bold text-gray-900 bg-white border border-gray-200 rounded-lg p-2.5 outline-none focus:border-indigo-500 transition-all"
                                     value={currentActionId || ''}
                                     onChange={(e) => onUpdate(streamName, { currentActionId: Number(e.target.value) })}
                                 >
                                     {actions.map(a => (
-                                        <option key={a.id} value={a.id}>{a.title} ({a.status})</option>
+                                        <option key={a.id} value={a.id}>{a.title}</option>
                                     ))}
                                 </select>
                             </div>
                             <button
-                                onClick={() => {
-                                    const newAction = {
-                                        id: Date.now(),
-                                        title: "New Action Item",
-                                        status: 'Not Started',
-                                        owner: '',
-                                        dueDate: ''
-                                    };
-                                    onUpdate(streamName, {
-                                        subStreams: [...actions, newAction],
-                                        currentActionId: newAction.id
-                                    });
-                                }}
-                                className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors"
-                                title="Add Manual Action"
+                                onClick={() => onOpenPanel(streamName)}
+                                className="mt-4 p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors"
+                                title="Add New Action"
                             >
-                                <Plus size={18} />
+                                <Plus size={16} />
                             </button>
                         </div>
-                        {/* Owner & Date */}
-                        <div className="grid grid-cols-2 gap-3 pt-2">
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Assign Owner</label>
-                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded p-1.5 code">
-                                    <User size={12} className="text-gray-400" />
-                                    <input
-                                        className="bg-transparent w-full text-xs font-medium outline-none"
-                                        placeholder="Name..."
-                                        value={currentAction?.owner || ''}
-                                        onChange={(e) => updateAction(currentActionId, 'owner', e.target.value)}
-                                    />
+
+                        {currentAction && (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Owner</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600">
+                                            {currentAction.owner ? currentAction.owner.charAt(0) : <User size={10} />}
+                                        </div>
+                                        <input
+                                            value={currentAction.owner || ''}
+                                            onChange={(e) => updateAction(currentAction.id, 'owner', e.target.value)}
+                                            placeholder="Unassigned"
+                                            className="bg-transparent text-xs font-medium text-gray-900 w-full outline-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Due Date</div>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar size={12} className="text-gray-400" />
+                                        <input
+                                            type="date"
+                                            value={currentAction.dueDate || ''}
+                                            onChange={(e) => updateAction(currentAction.id, 'dueDate', e.target.value)}
+                                            className="bg-transparent text-xs font-medium text-gray-900 w-full outline-none"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Target Date</label>
-                                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded p-1.5 code">
-                                    <Calendar size={12} className="text-gray-400" />
-                                    <input
-                                        type="date"
-                                        className="bg-transparent w-full text-xs font-medium outline-none"
-                                        value={currentAction?.dueDate || ''}
-                                        onChange={(e) => updateAction(currentActionId, 'dueDate', e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </>
+                        )}
+                    </div>
                 )}
             </div>
 
-            {/* BOTTOM: EXECUTION CONTROLS */}
-            {currentAction && (
-                <div className="bg-gray-50 p-4 border-t border-gray-100 space-y-3">
-                    <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">Action Status</label>
-                        <div className="flex bg-white rounded border border-gray-200 p-1 shadow-sm">
-                            {['Done', 'In Progress', 'Delayed'].map(st => (
-                                <button
-                                    key={st}
-                                    onClick={() => updateAction(currentActionId, 'status', st)}
-                                    className={`flex-1 text-[10px] font-bold py-1.5 rounded transition-all ${currentAction.status === st
-                                        ? (st === 'Done' ? 'bg-emerald-500 text-white shadow-md' : st === 'In Progress' ? 'bg-blue-500 text-white shadow-md' : 'bg-red-500 text-white shadow-md')
-                                        : 'text-gray-400 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    {st}
-                                </button>
-                            ))}
+            {/* 3. BOTTOM SECTION: Status & Links */}
+            <div className="bg-gray-50 p-4 border-t border-gray-100">
+                {currentAction ? (
+                    <div className="space-y-3">
+                        {/* Status Selector */}
+                        <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-sm">
+                            {['Not Started', 'In Progress', 'Done', 'Delayed'].map((st) => {
+                                const isActive = currentAction.status === st;
+                                let colorClass = 'bg-gray-900 text-white';
+                                if (st === 'Done') colorClass = 'bg-emerald-500 text-white';
+                                if (st === 'Delayed') colorClass = 'bg-red-500 text-white';
+                                if (st === 'In Progress') colorClass = 'bg-blue-600 text-white';
+
+                                return (
+                                    <button
+                                        key={st}
+                                        onClick={() => updateAction(currentAction.id, 'status', st)}
+                                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${isActive ? colorClass : 'text-gray-400 hover:bg-gray-50'
+                                            }`}
+                                    >
+                                        {st}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="grid grid-cols-3 gap-2">
+                            <button className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1">
+                                <BookOpen size={14} className="text-blue-500" />
+                                LEARN
+                            </button>
+                            <button
+                                onClick={() => setShowExperts(true)}
+                                className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1"
+                            >
+                                <Users size={14} className="text-purple-500" />
+                                DO
+                            </button>
+                            <button
+                                onClick={handlePlaybookGen}
+                                disabled={playbookLoading}
+                                className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1"
+                            >
+                                {playbookLoading ? <Loader2 size={14} className="animate-spin text-emerald-500" /> : <Play size={14} className="text-emerald-500" />}
+                                ACT
+                            </button>
                         </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button
-                            onClick={handlePlaybook}
-                            disabled={playbookLoading}
-                            className="py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-50 transition-colors flex items-center justify-center gap-1"
-                        >
-                            {playbookLoading ? <Loader2 size={12} className="animate-spin" /> : <BookOpen size={12} />}
-                            Playbook
-                        </button>
-                        <button
-                            onClick={() => setShowExperts(true)}
-                            className="py-2 bg-white border border-purple-200 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-50 transition-colors flex items-center justify-center gap-1"
-                        >
-                            <Users size={12} /> Experts
-                        </button>
+                ) : (
+                    <div className="text-center text-xs text-gray-400 py-4 italic">
+                        Select an action to update status
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
-            {/* EXPERTS MODAL */}
+            {/* EXPERTS MODAL (Reused) */}
             {showExperts && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
                         <div className="bg-purple-600 p-4 text-white flex justify-between items-center">
-                            <h3 className="font-bold">Recommended Experts</h3>
+                            <h3 className="font-bold">Execution Experts</h3>
                             <button onClick={() => setShowExperts(false)} className="hover:bg-white/20 p-1 rounded-full"><X size={16} /></button>
                         </div>
-                        <div className="p-4 space-y-3 max-h-[300px] overflow-y-auto">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer group">
-                                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center font-bold text-gray-500">E{i}</div>
-                                    <div className="flex-1">
-                                        <div className="font-bold text-sm text-gray-900 group-hover:text-purple-600">Expert Name {i}</div>
-                                        <div className="text-xs text-gray-500">Specialist in {streamName}</div>
-                                    </div>
-                                    <button className="p-2 text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100">
-                                        <MessageCircle size={16} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="p-4 bg-gray-50 text-center border-t border-gray-100">
-                            <p className="text-xs text-gray-400">Select an expert to request a session.</p>
+                        <div className="p-4 space-y-3">
+                            <p className="text-sm text-gray-600">Connect with experts for <b>{streamName}</b>.</p>
+                            {/* Placeholder for experts */}
+                            <div className="p-3 border border-gray-100 rounded-lg bg-gray-50 text-center text-xs text-gray-500">
+                                Expert list loading...
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -915,21 +995,7 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook })
     );
 };
 
-const StreamExecutionView = ({ profile, onUpdateProfile, onGeneratePlaybook }) => {
-    // Helper to update specific deep stream data
-    const handleStreamUpdate = (streamName, updates) => {
-        const currentStreams = profile.streams || {};
-        const newStreams = {
-            ...currentStreams,
-            [streamName]: {
-                ...(currentStreams[streamName] || {}),
-                ...updates
-            }
-        };
-        // Update profile via parent handler
-        onUpdateProfile('streams', newStreams);
-    };
-
+const StreamExecutionView = ({ profile, onUpdateProfile, onGeneratePlaybook, onOpenPanel }) => {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
             {STREAMS.map(stream => (
@@ -938,8 +1004,9 @@ const StreamExecutionView = ({ profile, onUpdateProfile, onGeneratePlaybook }) =
                     streamName={stream}
                     data={profile.streams?.[stream]}
                     profile={profile}
-                    onUpdate={handleStreamUpdate}
+                    onUpdate={onUpdateProfile}
                     onGeneratePlaybook={onGeneratePlaybook}
+                    onOpenPanel={onOpenPanel}
                 />
             ))}
         </div>
