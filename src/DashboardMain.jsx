@@ -667,8 +667,9 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
             if (Array.isArray(list)) {
                 const actions = list.map((item, idx) => ({
                     ...item,
+                    ...item,
                     id: Date.now() + idx,
-                    status: 'Not Started',
+                    status: 'Draft',
                     owner: '',
                     dueDate: new Date(Date.now() + (item.days_due || 30) * 86400000).toISOString().split('T')[0]
                 }));
@@ -760,8 +761,8 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
                                             key={i}
                                             onClick={() => toggleSelection(i)}
                                             className={`p-4 border rounded-xl cursor-pointer transition-all ${isSelected
-                                                    ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-500'
-                                                    : 'bg-white border-gray-100 hover:border-gray-200 opacity-60'
+                                                ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-500'
+                                                : 'bg-white border-gray-100 hover:border-gray-200 opacity-60'
                                                 }`}
                                         >
                                             <div className="flex items-start gap-3">
@@ -802,21 +803,46 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, o
 
     // Stream Data
     const streamData = data || { goal: "", rag: "Green", subStreams: [] };
-    const actions = streamData.subStreams || [];
-    const currentActionId = streamData.currentActionId;
-    const currentAction = actions.find(a => a.id === currentActionId) || actions[0] || null;
+    const allActions = streamData.subStreams || [];
+
+    // Split Actions
+    const draftActions = allActions.filter(a => a.status === 'Draft');
+    const committedActions = allActions.filter(a => a.status !== 'Draft');
+
+    // State for viewing/selecting committed actions
+    const [selectedActionId, setSelectedActionId] = useState(null);
+
+    // Determined Selected Action (for Footer Context)
+    // Default to the last committed action if none selected, or the specific selected one
+    const activeFooterAction = selectedActionId
+        ? committedActions.find(a => a.id === selectedActionId)
+        : (committedActions.length > 0 ? committedActions[committedActions.length - 1] : null);
 
     // Handlers
     const [playbookLoading, setPlaybookLoading] = useState(false);
 
-    // Handlers
     const updateAction = (actionId, field, value) => {
-        const newActions = actions.map(a => a.id === actionId ? { ...a, [field]: value } : a);
+        const newActions = allActions.map(a => a.id === actionId ? { ...a, [field]: value } : a);
         onUpdate(streamName, { subStreams: newActions });
     };
 
+    const confirmAction = (actionId) => {
+        const newActions = allActions.map(a => a.id === actionId ? { ...a, status: 'Not Started' } : a);
+        onUpdate(streamName, { subStreams: newActions });
+        // Auto select the newly confirmed action
+        setSelectedActionId(actionId);
+    };
+
+    const deleteAction = (actionId) => {
+        if (window.confirm("Are you sure you want to delete this action?")) {
+            const newActions = allActions.filter(a => a.id !== actionId);
+            onUpdate(streamName, { subStreams: newActions });
+            if (selectedActionId === actionId) setSelectedActionId(null);
+        }
+    };
+
     const handlePlaybookGen = async () => {
-        if (!currentAction) return;
+        if (!activeFooterAction) return;
         setPlaybookLoading(true);
         try {
             const { template } = await getPromptQuery('generate_stream_playbook', `
@@ -831,13 +857,13 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, o
             `);
             const prompt = hydratePrompt(template, {
                 streamName,
-                actionTitle: currentAction.title,
+                actionTitle: activeFooterAction.title,
                 endGoal: streamData.goal
             });
 
             console.log("Generating Playbook...");
             const html = await generateWithContext(prompt, profile);
-            onGeneratePlaybook(currentAction.title, html);
+            onGeneratePlaybook(activeFooterAction.title, html);
         } catch (e) {
             console.error(e);
             alert("Failed to generate playbook");
@@ -888,148 +914,189 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, o
                 </div>
             </div>
 
-            {/* 2. MIDDLE SECTION: Current Action */}
-            <div className="p-5 flex-1 flex flex-col justify-center">
-                {actions.length === 0 ? (
-                    <div className="text-center">
-                        <p className="text-xs text-gray-400 mb-3">No actions defined yet.</p>
+            {/* 2. MIDDLE SECTION: Staging / Planning Area */}
+            <div className="p-5 flex-1 flex flex-col justify-center border-b border-gray-100">
+                {draftActions.length > 0 ? (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="flex justify-between items-center">
+                            <label className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Planning Action (Draft)</label>
+                            <span className="text-[10px] text-gray-400">{draftActions.length} Pending</span>
+                        </div>
+
+                        {/* Only show the first draft action to focus user attention */}
+                        {(() => {
+                            const draft = draftActions[0];
+                            return (
+                                <div className="space-y-3">
+                                    <input
+                                        className="w-full text-sm font-bold text-gray-900 bg-gray-50 border border-indigo-100 rounded-lg p-3 outline-none focus:border-indigo-500 transition-all"
+                                        value={draft.title}
+                                        onChange={(e) => updateAction(draft.id, 'title', e.target.value)}
+                                    />
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                                            <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Owner</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600">
+                                                    {draft.owner ? draft.owner.charAt(0) : <User size={10} />}
+                                                </div>
+                                                <input
+                                                    value={draft.owner || ''}
+                                                    onChange={(e) => updateAction(draft.id, 'owner', e.target.value)}
+                                                    placeholder="Unassigned"
+                                                    className="bg-transparent text-xs font-medium text-gray-900 w-full outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                                            <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Due Date</div>
+                                            <div className="flex items-center gap-2">
+                                                <Calendar size={12} className="text-gray-400" />
+                                                <input
+                                                    type="date"
+                                                    value={draft.dueDate || ''}
+                                                    onChange={(e) => updateAction(draft.id, 'dueDate', e.target.value)}
+                                                    className="bg-transparent text-xs font-medium text-gray-900 w-full outline-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 mt-2">
+                                        <button
+                                            onClick={() => confirmAction(draft.id)}
+                                            className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <CheckCircle size={14} /> Confirm & Save
+                                        </button>
+                                        <button
+                                            onClick={() => deleteAction(draft.id)}
+                                            className="py-2 px-3 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                ) : (
+                    <div className="text-center py-6">
+                        <p className="text-xs text-gray-400 mb-3">No actions being planned.</p>
                         <button
                             onClick={() => onOpenPanel(streamName)}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors"
                         >
-                            <Plus size={14} /> Add First Action
+                            <Plus size={14} /> Add New Action
                         </button>
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1">
-                                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Current Action</label>
-                                <select
-                                    className="w-full text-sm font-bold text-gray-900 bg-white border border-gray-200 rounded-lg p-2.5 outline-none focus:border-indigo-500 transition-all"
-                                    value={currentActionId || ''}
-                                    onChange={(e) => onUpdate(streamName, { currentActionId: Number(e.target.value) })}
+                )}
+            </div>
+
+            {/* 3. BOTTOM SECTION: Committed List & Footer */}
+            <div className="bg-gray-50 flex flex-col h-full min-h-0">
+                {/* Scrollable Committed List */}
+                <div className="flex-1 overflow-y-auto p-4 max-h-[200px] space-y-2 custom-scrollbar">
+                    <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Committed Actions</label>
+                    {committedActions.length === 0 ? (
+                        <div className="text-center text-xs text-gray-300 py-4 italic">No confirmed actions yet.</div>
+                    ) : (
+                        committedActions.map(action => {
+                            const isActive = activeFooterAction && activeFooterAction.id === action.id;
+                            return (
+                                <div
+                                    key={action.id}
+                                    onClick={() => setSelectedActionId(action.id)}
+                                    className={`p-3 rounded-xl border transition-all cursor-pointer ${isActive ? 'bg-white border-indigo-200 shadow-sm ring-1 ring-indigo-500' : 'bg-white border-gray-100 hover:border-gray-200 opacity-80'
+                                        }`}
                                 >
-                                    {actions.map(a => (
-                                        <option key={a.id} value={a.id}>{a.title}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    if (window.confirm("Are you sure you want to delete this action?")) {
-                                        const newActions = actions.filter(a => a.id !== currentActionId);
-                                        onUpdate(streamName, {
-                                            subStreams: newActions,
-                                            currentActionId: newActions.length > 0 ? newActions[newActions.length - 1].id : null
-                                        });
-                                    }
-                                }}
-                                className="mt-4 p-2.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors ml-1"
-                                title="Delete Current Action"
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                            <button
-                                onClick={() => onOpenPanel(streamName)}
-                                className="mt-4 p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors"
-                                title="Add New Action"
-                            >
-                                <Plus size={16} />
-                            </button>
-                        </div>
-
-                        {currentAction && (
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
-                                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Owner</div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600">
-                                            {currentAction.owner ? currentAction.owner.charAt(0) : <User size={10} />}
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className={`text-xs font-bold line-clamp-1 ${isActive ? 'text-indigo-900' : 'text-gray-700'}`}>{action.title}</h4>
+                                        {/* Status Badge */}
+                                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${action.status === 'Done' ? 'bg-emerald-100 text-emerald-700' :
+                                                action.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                                                    action.status === 'Delayed' ? 'bg-red-100 text-red-700' :
+                                                        'bg-gray-100 text-gray-500'
+                                            }`}>
+                                            {action.status}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-400 uppercase font-bold">
+                                        <div className="flex items-center gap-1">
+                                            <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[8px]">
+                                                {action.owner ? action.owner.charAt(0) : <User size={8} />}
+                                            </div>
+                                            <span>{action.owner || 'Unassigned'}</span>
                                         </div>
-                                        <input
-                                            value={currentAction.owner || ''}
-                                            onChange={(e) => updateAction(currentAction.id, 'owner', e.target.value)}
-                                            placeholder="Unassigned"
-                                            className="bg-transparent text-xs font-medium text-gray-900 w-full outline-none"
-                                        />
+                                        <div className="flex items-center gap-1">
+                                            <Calendar size={10} />
+                                            <span>{action.dueDate}</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
-                                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Due Date</div>
-                                    <div className="flex items-center gap-2">
-                                        <Calendar size={12} className="text-gray-400" />
-                                        <input
-                                            type="date"
-                                            value={currentAction.dueDate || ''}
-                                            onChange={(e) => updateAction(currentAction.id, 'dueDate', e.target.value)}
-                                            className="bg-transparent text-xs font-medium text-gray-900 w-full outline-none"
-                                        />
-                                    </div>
-                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                {/* Footer Controls (Fixed at bottom) */}
+                <div className="p-4 border-t border-gray-100 bg-white">
+                    {activeFooterAction ? (
+                        <div className="space-y-3">
+                            {/* Update Status for Selected */}
+                            <div className="flex bg-gray-50 rounded-lg p-0.5">
+                                {['Not Started', 'In Progress', 'Done', 'Delayed'].map((st) => {
+                                    const isActive = activeFooterAction.status === st;
+                                    let colorClass = 'bg-white text-gray-900 shadow-sm';
+                                    if (st === 'Done' && isActive) colorClass = 'bg-emerald-500 text-white';
+                                    if (st === 'Delayed' && isActive) colorClass = 'bg-red-500 text-white';
+                                    if (st === 'In Progress' && isActive) colorClass = 'bg-blue-600 text-white';
+
+                                    return (
+                                        <button
+                                            key={st}
+                                            onClick={() => updateAction(activeFooterAction.id, 'status', st)}
+                                            className={`flex-1 py-1 text-[8px] font-bold uppercase tracking-wider rounded transition-all ${isActive ? colorClass : 'text-gray-400 hover:text-gray-600'
+                                                }`}
+                                        >
+                                            {st}
+                                        </button>
+                                    );
+                                })}
                             </div>
-                        )}
-                    </div>
-                )}
+
+                            <div className="grid grid-cols-3 gap-2">
+                                <button className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1">
+                                    <BookOpen size={14} className="text-blue-500" />
+                                    LEARN
+                                </button>
+                                <button
+                                    onClick={() => setShowExperts(true)}
+                                    className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1"
+                                >
+                                    <Users size={14} className="text-purple-500" />
+                                    DO
+                                </button>
+                                <button
+                                    onClick={handlePlaybookGen}
+                                    disabled={playbookLoading}
+                                    className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1"
+                                >
+                                    {playbookLoading ? <Loader2 size={14} className="animate-spin text-emerald-500" /> : <Play size={14} className="text-emerald-500" />}
+                                    ACT
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-center text-[10px] text-gray-400 py-1 uppercase tracking-wider font-bold">
+                            Select action to activate controls
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* 3. BOTTOM SECTION: Status & Links */}
-            <div className="bg-gray-50 p-4 border-t border-gray-100">
-                {currentAction ? (
-                    <div className="space-y-3">
-                        {/* Status Selector */}
-                        <div className="flex bg-white rounded-lg border border-gray-200 p-0.5 shadow-sm">
-                            {['Not Started', 'In Progress', 'Done', 'Delayed'].map((st) => {
-                                const isActive = currentAction.status === st;
-                                let colorClass = 'bg-gray-900 text-white';
-                                if (st === 'Done') colorClass = 'bg-emerald-500 text-white';
-                                if (st === 'Delayed') colorClass = 'bg-red-500 text-white';
-                                if (st === 'In Progress') colorClass = 'bg-blue-600 text-white';
-
-                                return (
-                                    <button
-                                        key={st}
-                                        onClick={() => updateAction(currentAction.id, 'status', st)}
-                                        className={`flex-1 py-1.5 text-[9px] font-bold uppercase tracking-wider rounded-md transition-all ${isActive ? colorClass : 'text-gray-400 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        {st}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="grid grid-cols-3 gap-2">
-                            <button className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1">
-                                <BookOpen size={14} className="text-blue-500" />
-                                LEARN
-                            </button>
-                            <button
-                                onClick={() => setShowExperts(true)}
-                                className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1"
-                            >
-                                <Users size={14} className="text-purple-500" />
-                                DO
-                            </button>
-                            <button
-                                onClick={handlePlaybookGen}
-                                disabled={playbookLoading}
-                                className="py-2 px-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 hover:border-gray-300 transition-all flex flex-col items-center gap-1"
-                            >
-                                {playbookLoading ? <Loader2 size={14} className="animate-spin text-emerald-500" /> : <Play size={14} className="text-emerald-500" />}
-                                ACT
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="text-center text-xs text-gray-400 py-4 italic">
-                        Select an action to update status
-                    </div>
-                )}
-            </div>
-
-            {/* EXPERTS MODAL (Reused) */}
+            {/* EXPERTS MODAL */}
             {showExperts && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden">
@@ -1039,7 +1106,6 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, o
                         </div>
                         <div className="p-4 space-y-3">
                             <p className="text-sm text-gray-600">Connect with experts for <b>{streamName}</b>.</p>
-                            {/* Placeholder for experts */}
                             <div className="p-3 border border-gray-100 rounded-lg bg-gray-50 text-center text-xs text-gray-500">
                                 Expert list loading...
                             </div>
