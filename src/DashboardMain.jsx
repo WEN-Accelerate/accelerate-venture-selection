@@ -617,6 +617,15 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
     const [generatedActions, setGeneratedActions] = useState([]);
     const [goal, setGoal] = useState(profile.streams?.[streamName]?.goal || '');
 
+    const [selectedIndices, setSelectedIndices] = useState(new Set());
+
+    const toggleSelection = (index) => {
+        const newSet = new Set(selectedIndices);
+        if (newSet.has(index)) newSet.delete(index);
+        else newSet.add(index);
+        setSelectedIndices(newSet);
+    };
+
     const handleGenerate = async () => {
         if (!goal) {
             alert("Please define an End Goal first.");
@@ -624,6 +633,7 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
         }
         setIsGenerating(true);
         setGeneratedActions([]);
+        setSelectedIndices(new Set());
 
         try {
             const { template } = await getPromptQuery('generate_substreams', `
@@ -655,13 +665,17 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
             const list = cleanAndParseJson(raw);
 
             if (Array.isArray(list)) {
-                setGeneratedActions(list.map((item, idx) => ({
+                const actions = list.map((item, idx) => ({
                     ...item,
                     id: Date.now() + idx,
                     status: 'Not Started',
                     owner: '',
                     dueDate: new Date(Date.now() + (item.days_due || 30) * 86400000).toISOString().split('T')[0]
-                })));
+                }));
+                setGeneratedActions(actions);
+                // Auto-select all by default
+                setSelectedIndices(new Set(actions.map((_, i) => i)));
+
             } else {
                 throw new Error("Invalid format returned by AI");
             }
@@ -677,13 +691,21 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
         const currentStream = profile.streams?.[streamName] || {};
         const existingActions = currentStream.subStreams || [];
 
+        // Filter only selected actions
+        const actionsToAdd = generatedActions.filter((_, i) => selectedIndices.has(i));
+
+        if (actionsToAdd.length === 0) {
+            alert("Please select at least one action to add.");
+            return;
+        }
+
         // Append new actions
-        const updatedActions = [...existingActions, ...generatedActions];
+        const updatedActions = [...existingActions, ...actionsToAdd];
 
         onUpdateStream(streamName, {
             goal: goal, // Ensure goal is synced
             subStreams: updatedActions,
-            currentActionId: generatedActions.length > 0 ? generatedActions[0].id : currentStream.currentActionId
+            currentActionId: actionsToAdd[0].id // Switch to the first added action
         });
 
         onClose();
@@ -729,24 +751,43 @@ const StreamSidePanel = ({ streamName, profile, onClose, onUpdateStream }) => {
                                 <CheckCircle size={16} className="text-emerald-500" />
                                 Proposed Actions ({generatedActions.length})
                             </h3>
+
                             <div className="space-y-3">
-                                {generatedActions.map((action, i) => (
-                                    <div key={i} className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
-                                        <div className="font-bold text-indigo-900 text-sm mb-1">{action.title}</div>
-                                        <div className="text-xs text-indigo-700 mb-2">{action.description}</div>
-                                        <div className="flex items-center gap-4 text-[10px] font-bold text-indigo-500 uppercase">
-                                            <span>Deliverable: {action.deliverable}</span>
-                                            <span>Due: {action.days_due} days</span>
+                                {generatedActions.map((action, i) => {
+                                    const isSelected = selectedIndices.has(i);
+                                    return (
+                                        <div
+                                            key={i}
+                                            onClick={() => toggleSelection(i)}
+                                            className={`p-4 border rounded-xl cursor-pointer transition-all ${isSelected
+                                                    ? 'bg-indigo-50 border-indigo-200 ring-1 ring-indigo-500'
+                                                    : 'bg-white border-gray-100 hover:border-gray-200 opacity-60'
+                                                }`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'
+                                                    }`}>
+                                                    {isSelected && <Check size={12} className="text-white" />}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className={`font-bold text-sm mb-1 ${isSelected ? 'text-indigo-900' : 'text-gray-500'}`}>{action.title}</div>
+                                                    <div className={`text-xs mb-2 ${isSelected ? 'text-indigo-700' : 'text-gray-400'}`}>{action.description}</div>
+                                                    <div className={`flex items-center gap-4 text-[10px] font-bold uppercase ${isSelected ? 'text-indigo-500' : 'text-gray-300'}`}>
+                                                        <span>Due: {action.days_due} days</span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <button
                                 onClick={handleAddActions}
-                                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200"
+                                disabled={selectedIndices.size === 0}
+                                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50 disabled:shadow-none"
                             >
-                                Add Actions to Stream
+                                Add Selected Actions ({selectedIndices.size})
                             </button>
                         </div>
                     )}
@@ -779,14 +820,14 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, o
         setPlaybookLoading(true);
         try {
             const { template } = await getPromptQuery('generate_stream_playbook', `
-                Act as a Business Process Expert.
-                Stream: "{{streamName}}"
-                Action: "{{actionTitle}}"
-                Goal: "{{endGoal}}"
-                
-                Create a "Playbook" SOP (HTML).
-                Structure: Title, SOP Steps, Resources, KPIs.
-                Use Tailwind CSS. No html/body tags.
+            Act as a Business Process Expert.
+            Stream: "{{ streamName }}"
+            Action: "{{ actionTitle }}"
+            Goal: "{{ endGoal }}"
+
+            Create a "Playbook" SOP (HTML).
+            Structure: Title, SOP Steps, Resources, KPIs.
+            Use Tailwind CSS. No html/body tags.
             `);
             const prompt = hydratePrompt(template, {
                 streamName,
@@ -874,6 +915,21 @@ const StreamCard = ({ streamName, data, profile, onUpdate, onGeneratePlaybook, o
                                     ))}
                                 </select>
                             </div>
+                            <button
+                                onClick={() => {
+                                    if (window.confirm("Are you sure you want to delete this action?")) {
+                                        const newActions = actions.filter(a => a.id !== currentActionId);
+                                        onUpdate(streamName, {
+                                            subStreams: newActions,
+                                            currentActionId: newActions.length > 0 ? newActions[newActions.length - 1].id : null
+                                        });
+                                    }
+                                }}
+                                className="mt-4 p-2.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg transition-colors ml-1"
+                                title="Delete Current Action"
+                            >
+                                <Trash2 size={16} />
+                            </button>
                             <button
                                 onClick={() => onOpenPanel(streamName)}
                                 className="mt-4 p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors"
