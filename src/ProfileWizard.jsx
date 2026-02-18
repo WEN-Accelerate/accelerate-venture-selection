@@ -136,6 +136,16 @@ export default function ProfileWizard() {
     const [learnMoreData, setLearnMoreData] = useState(null); // Changed to object for structured UI
     const [learnMoreLoading, setLearnMoreLoading] = useState(false);
 
+    // Expansion Flow State
+    const [expansionDetails, setExpansionDetails] = useState({
+        customerModel: "", // B2B, B2C, D2C, B2G, B2B2C
+        marketFocus: "", // Existing vs New (Domestic)
+        productFocus: "", // Existing vs New (Domestic)
+        entryMode: "", // Organic vs Partnership (International)
+    });
+    const [archetypes, setArchetypes] = useState([]);
+    const [archetypeLoading, setArchetypeLoading] = useState(false);
+
     // Auth State
     const [user, setUser] = useState(null);
 
@@ -675,6 +685,122 @@ export default function ProfileWizard() {
         setIsProcessingTranscript(false);
     };
 
+    // --- NEW STRATEGY ARCHETYPE LOGIC ---
+    const generateStrategyArchetypes = async () => {
+        setArchetypeLoading(true);
+        setArchetypes([]);
+
+        const isDomestic = profile.ventureType === 'Domestic';
+
+        try {
+            let promptKey = "";
+            let defaultTemplate = "";
+            let promptVariables = {};
+
+            if (isDomestic) {
+                // DOMESTIC LOGIC (Ansoff Matrix)
+                // Map inputs to Quadrant
+                let quadrant = "Unknown";
+                if (expansionDetails.marketFocus === 'Existing' && expansionDetails.productFocus === 'Existing') quadrant = "Market Deepening";
+                else if (expansionDetails.marketFocus === 'Existing' && expansionDetails.productFocus === 'New') quadrant = "Product Upgrade";
+                else if (expansionDetails.marketFocus === 'New' && expansionDetails.productFocus === 'Existing') quadrant = "Market Expansion";
+                else if (expansionDetails.marketFocus === 'New' && expansionDetails.productFocus === 'New') quadrant = "Strategic Diversion";
+
+                promptKey = 'generate_archetypes_domestic';
+                promptVariables = {
+                    quadrant,
+                    marketFocus: expansionDetails.marketFocus,
+                    productFocus: expansionDetails.productFocus,
+                    customerModel: expansionDetails.customerModel
+                };
+
+                defaultTemplate = `
+                    Act as a Growth Strategy Expert using Ansoff's Matrix.
+                    Company: {{companyName}}
+                    Industry: {{industry}}
+                    Quadrant identified: {{quadrant}} (Market Focus: {{marketFocus}}, Product Focus: {{productFocus}}).
+                    Customer Model: {{customerModel}}.
+                    
+                    Goal: Generate 3 distinct, actionable strategy archetype cards for this specific quadrant.
+                    For "Market Deepening", specific tactics might include "Loyalty Program", "Upselling", "Distribution Efficiency". 
+                    Customize the titles to be specific (e.g. "Market Deepening: Loyalty Boost").
+
+                    Return strictly JSON:
+                    [
+                        {
+                            "title": "Strategy Name",
+                            "description": "2-line goal/context description tailored to the industry.",
+                            "outcome": "Example deliverable (e.g. 'Launch Plan', 'Partnership Agreement')"
+                        }
+                    ]
+                `;
+
+            } else {
+                // INTERNATIONAL LOGIC (10 Types)
+                // Pool: Importer Leads, Institutional Sales, Overseas Agents, Trade Expos, FDI, Joint Ventures, Cross-border E-com, Merchant Exporters, Trade Missions, Franchising
+
+                promptKey = 'generate_archetypes_international';
+                promptVariables = {
+                    customerModel: expansionDetails.customerModel,
+                    entryMode: expansionDetails.entryMode
+                };
+
+                defaultTemplate = `
+                    Act as an International Trade Expert.
+                    Company: {{companyName}}
+                    Industry: {{industry}}
+                    Sales Model: {{customerModel}} (Primary).
+                    Entry Preference: {{entryMode}}.
+                    
+                    Goal: Select the top 3-5 most relevant entry modes from this standard list:
+                    [Generating Importer Leads, Institutional Sales, Overseas Agents/Distributors, International Trade Expos, Foreign Office (FDI), Joint Ventures, Cross-border E-commerce, Merchant Exporters, Trade Missions, Franchise/Licensing].
+                    
+                    Logic Guide:
+                    - {{customerModel}} + Partnership -> Favor Agents, JV, Franchising.
+                    - {{customerModel}} + Organic -> Favor E-commerce, FDI, Trade Expos.
+                    - B2G -> Favor Institutional Sales, Trade Missions.
+                    
+                    Return strictly JSON array of objects:
+                    [
+                        {
+                            "title": "Strategy Name (choose from list)",
+                            "description": "2-line goal/context description.",
+                            "outcome": "Example deliverable."
+                        }
+                    ]
+                `;
+            }
+
+            const { template } = await getPromptQuery(promptKey, defaultTemplate);
+            const prompt = hydratePrompt(template, { ...profile, ...promptVariables });
+
+            const raw = await generateWithContext(prompt, profile);
+            const data = cleanAndParseJson(raw);
+
+            setArchetypes(Array.isArray(data) ? data : []);
+            setStep(4.2); // Move to Archetype Selection
+
+        } catch (e) {
+            console.error("Archetype Gen Error", e);
+            alert("Could not generate strategies. Please try again.");
+        }
+        setArchetypeLoading(false);
+    };
+
+    const handleSelectArchetype = (arch) => {
+        setProfile(prev => ({
+            ...prev,
+            strategyDescription: `${arch.title}: ${arch.description}`,
+            // We can also pre-fill dimensions or context based on this choice
+        }));
+        setAiContext(`Selected Strategy: ${arch.title}`);
+        setStep(6); // Skip Transcript (Step 5) and go straight to Define Strategy (Step 6) - per User flow: "feeds into Strategy Planning"
+        // Alternatively, if we want to allow refining via transcript, we could go to 5. 
+        // User said: "The chosen archetype then feeds into the Strategy Planning module... pre-filled intent".
+        // Step 6 is "Define Expansion Strategy" (4Ps). Pre-filling strategyDescription effectively does this.
+    };
+
+
     // --- FINAL SAVE ---
     // --- FINAL SAVE ---
     const handleSave = async () => {
@@ -785,7 +911,7 @@ export default function ProfileWizard() {
                 <div className="flex items-center gap-6">
                     <div className="flex flex-col items-end gap-1">
                         <div className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                            Step {step} of 11
+                            Step {Math.floor(step)} of 11
                         </div>
                         {/* Progress Bar */}
                         <div className="w-32 h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -1072,15 +1198,166 @@ export default function ProfileWizard() {
                             </button>
                         </div>
 
-                        <button key="next4" onClick={() => setStep(5)} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
-                            Proceed to Strategy
+                        <button key="next4" onClick={() => setStep(4.1)} className="w-full mt-6 py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200">
+                            Define Expansion Context
                         </button>
                     </StepContainer>
                 )}
 
-                {/* STEP 5: TRANSCRIPT UPLOAD (STRATEGY) */}
+                {/* STEP 4.1: CONTEXT QUESTIONS (Domestic/International) */}
+                {step === 4.1 && (
+                    <StepContainer
+                        title={`Refine ${profile.ventureType} Context`}
+                        onBack={() => setStep(4)}
+                        aiContext={aiContext}
+                    >
+                        <div className="space-y-6">
+                            <p className="text-gray-600">Answer a few questions to help us identify the best strategy models for you.</p>
+
+                            {/* Q1: Customer Model (Both) */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Primary Customer Model</label>
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    {['B2B', 'B2C', 'D2C', 'B2G', 'B2B2C'].map(model => (
+                                        <button
+                                            key={model}
+                                            onClick={() => setExpansionDetails({ ...expansionDetails, customerModel: model })}
+                                            className={`p-3 rounded-lg border text-sm font-bold transition-all ${expansionDetails.customerModel === model
+                                                ? 'bg-red-50 border-red-500 text-red-700'
+                                                : 'bg-white border-gray-200 text-gray-600 hover:border-red-200'}`}
+                                        >
+                                            {model}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {profile.ventureType === 'Domestic' ? (
+                                <>
+                                    {/* Domestic Q2: Market Focus */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Market Focus</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <button
+                                                onClick={() => setExpansionDetails({ ...expansionDetails, marketFocus: 'Existing' })}
+                                                className={`p-4 text-left rounded-xl border transition-all ${expansionDetails.marketFocus === 'Existing' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                            >
+                                                <div className="font-bold text-gray-900">Current Markets</div>
+                                                <div className="text-xs text-gray-500 mt-1">Serve existing customer limit or segments.</div>
+                                            </button>
+                                            <button
+                                                onClick={() => setExpansionDetails({ ...expansionDetails, marketFocus: 'New' })}
+                                                className={`p-4 text-left rounded-xl border transition-all ${expansionDetails.marketFocus === 'New' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                            >
+                                                <div className="font-bold text-gray-900">New Markets</div>
+                                                <div className="text-xs text-gray-500 mt-1">Enter new geographies or customer segments.</div>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Domestic Q3: Product Focus */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Product Strategy</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <button
+                                                onClick={() => setExpansionDetails({ ...expansionDetails, productFocus: 'Existing' })}
+                                                className={`p-4 text-left rounded-xl border transition-all ${expansionDetails.productFocus === 'Existing' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                            >
+                                                <div className="font-bold text-gray-900">Existing Products</div>
+                                                <div className="text-xs text-gray-500 mt-1">Scale what you already have.</div>
+                                            </button>
+                                            <button
+                                                onClick={() => setExpansionDetails({ ...expansionDetails, productFocus: 'New' })}
+                                                className={`p-4 text-left rounded-xl border transition-all ${expansionDetails.productFocus === 'New' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                            >
+                                                <div className="font-bold text-gray-900">New Products</div>
+                                                <div className="text-xs text-gray-500 mt-1">Launch new offerings or upgrades.</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* International Q2: Entry Mode */}
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Entry Preference</label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <button
+                                                onClick={() => setExpansionDetails({ ...expansionDetails, entryMode: 'Organic' })}
+                                                className={`p-4 text-left rounded-xl border transition-all ${expansionDetails.entryMode === 'Organic' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                            >
+                                                <div className="font-bold text-gray-900">Organic Entry</div>
+                                                <div className="text-xs text-gray-500 mt-1">Direct control (e.g. FDI, E-commerce, Direct Export).</div>
+                                            </button>
+                                            <button
+                                                onClick={() => setExpansionDetails({ ...expansionDetails, entryMode: 'Partnership' })}
+                                                className={`p-4 text-left rounded-xl border transition-all ${expansionDetails.entryMode === 'Partnership' ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                                            >
+                                                <div className="font-bold text-gray-900">Partnership-Led</div>
+                                                <div className="text-xs text-gray-500 mt-1">Leverage locals (e.g. Distributors, JVs, Agents).</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            <button
+                                onClick={generateStrategyArchetypes}
+                                disabled={
+                                    !expansionDetails.customerModel ||
+                                    (profile.ventureType === 'Domestic' && (!expansionDetails.marketFocus || !expansionDetails.productFocus)) ||
+                                    (profile.ventureType === 'International' && !expansionDetails.entryMode)
+                                }
+                                className="w-full py-3 bg-[#D32F2F] text-white rounded-xl font-bold hover:bg-[#B71C1C] transition-colors shadow-lg shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {archetypeLoading ? <Loader2 className="animate-spin" /> : <Sparkles size={18} />}
+                                Identify Strategies
+                            </button>
+                        </div>
+                    </StepContainer>
+                )}
+
+                {/* STEP 4.2: ARCHETYPE SELECTION */}
+                {step === 4.2 && (
+                    <StepContainer
+                        title="Select Your Strategy"
+                        onBack={() => setStep(4.1)}
+                        aiContext={aiContext}
+                    >
+                        <p className="-mt-6 mb-6 text-gray-500">Based on your inputs, here are the recommended growth archetypes.</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {archetypes.map((arch, idx) => (
+                                <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-xl hover:border-red-300 transition-all group flex flex-col h-full">
+                                    <div className="mb-4">
+                                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-[#D32F2F] transition-colors">{arch.title}</h3>
+                                        <div className="h-1 w-12 bg-red-100 group-hover:bg-red-500 rounded-full mt-2 transition-colors"></div>
+                                    </div>
+
+                                    <p className="text-sm text-gray-600 mb-4 flex-1 leading-relaxed">
+                                        {arch.description}
+                                    </p>
+
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-6">
+                                        <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Example Outcome</span>
+                                        <span className="text-xs font-medium text-gray-800">{arch.outcome}</span>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleSelectArchetype(arch)}
+                                        className="w-full py-2.5 bg-white border-2 border-gray-900 text-gray-900 font-bold rounded-lg hover:bg-gray-900 hover:text-white transition-all text-sm"
+                                    >
+                                        Select this Strategy
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </StepContainer>
+                )}
+
+                {/* STEP 5: TRANSCRIPT UPLOAD (STRATEGY) - Kept as option to refine further */}
                 {step === 5 && (
-                    <StepContainer title="Refine Strategy with Context" onBack={() => setStep(4)} aiContext={aiContext}>
+                    <StepContainer title="Refine Strategy with Context" onBack={() => setStep(4.2)} aiContext={aiContext}>
                         <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-2xl border border-indigo-100">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="p-3 bg-indigo-100 text-indigo-600 rounded-full">
@@ -1127,7 +1404,7 @@ export default function ProfileWizard() {
 
                 {/* STEP 6: 4 DIMENSIONS (Was 5) */}
                 {step === 6 && (
-                    <StepContainer title="Define Expansion Strategy" onBack={handleBack} aiContext={aiContext}>
+                    <StepContainer title="Define Expansion Strategy" onBack={() => setStep(step === 6 ? 4.2 : 5)} aiContext={aiContext}>
                         <div className="space-y-4">
                             <div className="flex justify-between items-center mb-4">
                                 <p className="text-gray-500 text-sm">Define your strategy across 4 key dimensions.</p>
@@ -1524,8 +1801,8 @@ export default function ProfileWizard() {
                                                 value={sData.rag}
                                                 onChange={(e) => handleStreamUpdate(stream, 'rag', e.target.value)}
                                                 className={`text-xs font-bold px-2 py-1 rounded border-none focus:ring-1 cursor-pointer outline-none ${sData.rag === 'Red' ? 'bg-red-100 text-red-700' :
-                                                        sData.rag === 'Amber' ? 'bg-amber-100 text-amber-700' :
-                                                            'bg-emerald-100 text-emerald-700'
+                                                    sData.rag === 'Amber' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-emerald-100 text-emerald-700'
                                                     }`}
                                             >
                                                 <option value="Green">On Track</option>
