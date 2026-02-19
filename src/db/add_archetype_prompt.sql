@@ -1,6 +1,5 @@
-
 -- Prompt for DOMESTIC expansion strategies (Ansoff Matrix)
-INSERT INTO prompts (key, template, description)
+INSERT INTO ai_prompts (slug, template, description)
 VALUES (
     'generate_archetypes_domestic',
     'Act as a Growth Strategy Expert using Ansoff''s Matrix.
@@ -23,11 +22,12 @@ VALUES (
     ]',
     'Generates Ansoff Matrix strategy archetypes for domestic expansion.'
 )
-ON CONFLICT (key) DO UPDATE 
+ON CONFLICT (slug) DO UPDATE 
 SET template = EXCLUDED.template;
 
 -- Prompt for INTERNATIONAL expansion strategies (10 Common Modes)
-INSERT INTO prompts (key, template, description)
+-- Prompt for INTERNATIONAL expansion strategies (10 Common Modes)
+INSERT INTO ai_prompts (slug, template, description)
 VALUES (
     'generate_archetypes_international',
     'Act as an International Trade Expert.
@@ -54,5 +54,5 @@ VALUES (
     ]',
     'Generates international expansion strategy archetypes based on 10 standard modes.'
 )
-ON CONFLICT (key) DO UPDATE 
+ON CONFLICT (slug) DO UPDATE 
 SET template = EXCLUDED.template;
